@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import json
 import sys
 import subprocess
@@ -194,5 +196,5 @@ if not CLI_LIGHTNING_COMMAND:
 command = sys.argv[1]
 
 if command == "funds":
-    json_text = json.loads(subprocess.check_output([CLI_LIGHTNING_COMMAND, 'listfunds']))
-    cmd_funds(json.loads(json_text))
+    json_data = json.loads(subprocess.check_output([CLI_LIGHTNING_COMMAND, 'listfunds']))
+    cmd_funds(json_data)
