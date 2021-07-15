@@ -77,6 +77,7 @@ class Node:
     def __init__(self):
         self.getinfo = clapi.getinfo()
         self.id = self.getinfo["id"]
+        self.fees_collected = self.getinfo["msatoshi_fees_collected"] / 1000
         self.listfunds = clapi.listfunds()
         self.listchannels = clapi.listchannels("null", self.id)
         self.channels = {}
@@ -142,6 +143,7 @@ class Node:
         print("- Grand total:   {:11.8f}".format(self.total / SATS_PER_BTC))
         tvl = self.total_output + self.total_wallet
         print("Total Value Locked: {:11.8f}".format(tvl / SATS_PER_BTC))
+        print("Fees collected    : {:14.11f}".format(self.fees_collected / SATS_PER_BTC))
 
 
 my_node = Node()
