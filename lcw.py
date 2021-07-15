@@ -101,12 +101,16 @@ class Node:
             total = channel_data["channel_total_sat"]
             output = channel_data["channel_sat"]
             input = total - output
-            short_channel_id = channel_data["short_channel_id"]
+            if "short_channel_id" in channel_data:
+                short_channel_id = channel_data["short_channel_id"]
+            else:
+                short_channel_id = ""
             channel = munch.Munch(peer_id=channel_data["peer_id"],
                                   input=input,
                                   output=output,
                                   total=input + output,
-                                  state=channel_data["state"])
+                                  state=channel_data["state"],
+                                  last_update=NOW)
             self.channels[short_channel_id] = channel
             self.total_input += input
             self.total_output += output
