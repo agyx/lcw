@@ -11,6 +11,7 @@ import time
 SATS_PER_BTC = 100000000
 CLI_LIGHTNING_COMMAND = None
 DAY = 86400
+NOW = int(time.time())
 
 def file_content(path):
     file = open(path, mode="r")
@@ -31,8 +32,8 @@ def cli_query(params):
 
 
 def age_string(timestamp):
-    now = int(time.time())
-    age = now - timestamp
+    global NOW
+    age = NOW - timestamp
     if age < DAY:
         return "today"
     days = age // DAY
@@ -81,6 +82,7 @@ class Node:
         self.listfunds = clapi.listfunds()
         self.listchannels = clapi.listchannels("null", self.id)
         self.channels = {}
+        self.all_last_updates = []
 
         self.wallet_value_confirmed = 0
         self.wallet_value_unconfirmed = 0
@@ -116,6 +118,7 @@ class Node:
                 continue
             channel = self.channels[channel_id]
             channel.last_update = channel_data["last_update"]
+            self.all_last_updates += [channel.last_update]
 
     def print_status(self):
         print("Wallet funds (BTC):")
@@ -144,6 +147,14 @@ class Node:
         tvl = self.total_output + self.total_wallet
         print("Total Value Locked: {:11.8f}".format(tvl / SATS_PER_BTC))
         print("Fees collected    : {:14.11f}".format(self.fees_collected / SATS_PER_BTC))
+        self.all_last_updates.sort()
+        if len(self.all_last_updates) > 0:
+            median_index = len(self.all_last_updates) // 2
+            if median_index * 2 == len(self.all_last_updates):
+                median_value = (self.all_last_updates[median_index - 1] + self.all_last_updates[median_index]) // 2
+            else:
+                median_value = self.all_last_updates[median_index]
+            print("Median age        : {:4.1f} days".format((NOW - median_value) / DAY))
 
 
 my_node = Node()
