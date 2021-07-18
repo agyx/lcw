@@ -6,12 +6,14 @@ import subprocess
 import os
 import munch
 import time
+from optparse import OptionParser
 
 
 SATS_PER_BTC = 100000000
 CLI_LIGHTNING_COMMAND = None
 DAY = 86400
 NOW = int(time.time())
+
 
 def file_content(path):
     file = open(path, mode="r")
@@ -40,7 +42,17 @@ def age_string(timestamp):
     if days == 1:
         return "1 day"
     else:
-        return "{} days".format(days)
+        return "{:2d} days".format(days)
+
+
+def peer_id_string(peer_id, verbose=False):
+    if verbose:
+        return peer_id
+    else:
+        return "{}...{}".format(
+            peer_id[:8],
+            peer_id[-9:-1],
+        )
 
 
 class CLightning:
@@ -65,12 +77,6 @@ class CLightning:
             return file_content("tests/listchannels.txt")
         else:
             return cli_query(['listchannels', short_channel_id, source_node_id])
-
-
-command = sys.argv[1]
-
-
-clapi = CLightning(test_mode=(command == "test"))
 
 
 class Node:
@@ -124,7 +130,7 @@ class Node:
             channel.last_update = channel_data["last_update"]
             self.all_last_updates += [channel.last_update]
 
-    def print_status(self):
+    def print_status(self, verbose=False):
         print("Wallet funds (BTC):")
         print("- Confirmed:   {:11.8f}".format(self.wallet_value_confirmed / SATS_PER_BTC))
         print("- Unconfirmed: {:11.8f}".format(self.wallet_value_unconfirmed / SATS_PER_BTC))
@@ -133,10 +139,9 @@ class Node:
         for (channel_id, channel) in self.channels.items():
             input_str = "{:11.8f}".format(channel.input / SATS_PER_BTC) if channel.input else " -         "
             output_str = "{:11.8f}".format(channel.output / SATS_PER_BTC) if channel.output else " -         "
-            print("- {:13s}  {}...{} {}-{}  {:11.8f}  {}  {}".format(
+            print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}".format(
                 channel_id,
-                channel.peer_id[:8],
-                channel.peer_id[-9:-1],
+                peer_id_string(channel.peer_id, verbose),
                 input_str,
                 output_str,
                 channel.total / SATS_PER_BTC,
@@ -149,8 +154,8 @@ class Node:
         print("- Total output:  {:11.8f}".format(self.total_output / SATS_PER_BTC))
         print("- Grand total:   {:11.8f}".format(self.total / SATS_PER_BTC))
         tvl = self.total_output + self.total_wallet
-        print("Total Value Locked: {:11.8f}".format(tvl / SATS_PER_BTC))
-        print("Fees collected    : {:14.11f}".format(self.fees_collected / SATS_PER_BTC))
+        print("Node Value         : {:11.8f}".format(tvl / SATS_PER_BTC))
+        print("Fees collected     : {:14.11f}".format(self.fees_collected / SATS_PER_BTC))
         self.all_last_updates.sort()
         if len(self.all_last_updates) > 0:
             median_index = len(self.all_last_updates) // 2
@@ -158,11 +163,26 @@ class Node:
                 median_value = (self.all_last_updates[median_index - 1] + self.all_last_updates[median_index]) // 2
             else:
                 median_value = self.all_last_updates[median_index]
-            print("Median age        : {:4.1f} days".format((NOW - median_value) / DAY))
+            print("Median last update : {:4.1f} days".format((NOW - median_value) / DAY))
 
+
+parser = OptionParser()
+
+parser.add_option("-t", "--test",
+                  action="store_true", dest="test_mode", default=False,
+                  help="Test mode")
+
+parser.add_option("-v", "--verbose",
+                  action="store_true", dest="verbose", default=False,
+                  help="Verbose")
+
+(options, args) = parser.parse_args()
+
+clapi = CLightning(test_mode=options.test_mode)
 
 my_node = Node()
-my_node.print_status()
+
+my_node.print_status(verbose=options.verbose)
 
 
 """
