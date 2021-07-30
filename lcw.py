@@ -152,6 +152,8 @@ class Node:
             self.all_last_updates += [channel.last_update]
         for peer_data in self.listpeers["peers"]:
             for channel_data in peer_data["channels"]:
+                if "short_channel_id" not in channel_data:
+                    continue
                 channel_id = channel_data["short_channel_id"]
                 if channel_id not in self.channels:
                     print("channel {} not in listpeers".format(channel_id))
@@ -188,17 +190,17 @@ class Node:
                 tx_per_day = 0
             else:
                 tx_per_day = total_payments / (age / 86400)
-            print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {}  {:5.1f}  {}".format(
+            print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {:5.1f}  {}".format(
                 channel_id,
                 peer_id_string(channel.peer_id, verbose),
                 input_str,
                 output_str,
                 channel.total / SATS_PER_BTC,
                 payments_str,
-                channel.state,
                 age_string2(age),
                 tx_per_day,
-                age_string(channel.last_update),
+                # age_string(channel.last_update),
+                channel.state,
             ))
         print("Channels summary:")
         print("- # of channels:  {}".format(self.channel_count))
@@ -211,14 +213,14 @@ class Node:
         print("Out payments       : {}".format(self.out_payments))
         print("Total payments     : {}".format(self.in_payments + self.out_payments))
         print("Fees collected     : {:14.11f}".format(self.fees_collected / SATS_PER_BTC))
-        self.all_last_updates.sort()
-        if len(self.all_last_updates) > 0:
-            median_index = len(self.all_last_updates) // 2
-            if median_index * 2 == len(self.all_last_updates):
-                median_value = (self.all_last_updates[median_index - 1] + self.all_last_updates[median_index]) // 2
-            else:
-                median_value = self.all_last_updates[median_index]
-            print("Median last update : {:4.1f} days".format((NOW - median_value) / DAY))
+        # self.all_last_updates.sort()
+        # if len(self.all_last_updates) > 0:
+        #     median_index = len(self.all_last_updates) // 2
+        #     if median_index * 2 == len(self.all_last_updates):
+        #         median_value = (self.all_last_updates[median_index - 1] + self.all_last_updates[median_index]) // 2
+        #     else:
+        #         median_value = self.all_last_updates[median_index]
+        #     print("Median last update : {:4.1f} days".format((NOW - median_value) / DAY))
 
 
 parser = OptionParser()
