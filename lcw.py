@@ -35,14 +35,18 @@ def cli_query(params):
 
 def age_string(timestamp):
     global NOW
-    age = NOW - timestamp
+    return age_string2(NOW - timestamp)
+
+
+def age_string2(age_seconds):
+    age = age_seconds
     if age < DAY:
         return "   today"
     days = age // DAY
     if days == 1:
-        return " 1 day"
+        return " 1 day  "
     else:
-        return "{:2d} days".format(days)
+        return "{:2d} days ".format(days)
 
 
 def peer_id_string(peer_id, verbose=False):
@@ -111,6 +115,8 @@ class Node:
         self.channel_count = 0
         self.in_payments = 0
         self.out_payments = 0
+        self.new_channels = 0
+        self.block_height = self.getinfo["blockheight"]
         for channel_data in self.listfunds["channels"]:
             self.channel_count += 1
             total = channel_data["channel_total_sat"]
@@ -118,8 +124,11 @@ class Node:
             input = total - output
             if "short_channel_id" in channel_data:
                 short_channel_id = channel_data["short_channel_id"]
+                new_channel = False
             else:
-                short_channel_id = ""
+                short_channel_id = "new-" + str(self.new_channels)
+                self.new_channels += 1
+                new_channel = True
             channel = munch.Munch(peer_id=channel_data["peer_id"],
                                   input=input,
                                   output=output,
@@ -127,7 +136,8 @@ class Node:
                                   state=channel_data["state"],
                                   last_update=NOW,
                                   in_payments=0,
-                                  out_payments=0)
+                                  out_payments=0,
+                                  new_channel=new_channel)
             self.channels[short_channel_id] = channel
             self.total_input += input
             self.total_output += output
@@ -151,6 +161,11 @@ class Node:
                 channel.out_payments = channel_data["out_payments_fulfilled"]
                 self.in_payments += channel.in_payments
                 self.out_payments += channel.out_payments
+        for (channel_id, channel) in self.channels.items():
+            if channel.new_channel:
+                channel.funding_block = self.block_height
+            else:
+                channel.funding_block = int(channel_id.split("x")[0])
 
     def print_status(self, verbose=False):
         print("Wallet funds (BTC):")
@@ -161,13 +176,19 @@ class Node:
         for (channel_id, channel) in self.channels.items():
             input_str = "{:11.8f}".format(channel.input / SATS_PER_BTC) if channel.input else " -         "
             output_str = "{:11.8f}".format(channel.output / SATS_PER_BTC) if channel.output else " -         "
+            total_payments = channel.in_payments + channel.out_payments
             payments_str = "{:8s} {:4d}".format(
                 "{:4d}-{:<d}".format(
                     channel.in_payments,
                     channel.out_payments),
-                channel.in_payments + channel.out_payments,
+                total_payments,
             )
-            print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {}".format(
+            age = (self.block_height - channel.funding_block) * 600
+            if age <= 0:
+                tx_per_day = 0
+            else:
+                tx_per_day = total_payments / (age / 86400)
+            print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {}  {:5.1f}  {}".format(
                 channel_id,
                 peer_id_string(channel.peer_id, verbose),
                 input_str,
@@ -175,7 +196,9 @@ class Node:
                 channel.total / SATS_PER_BTC,
                 payments_str,
                 channel.state,
-                age_string(channel.last_update)
+                age_string2(age),
+                tx_per_day,
+                age_string(channel.last_update),
             ))
         print("Channels summary:")
         print("- # of channels:  {}".format(self.channel_count))
