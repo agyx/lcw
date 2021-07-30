@@ -78,6 +78,12 @@ class CLightning:
         else:
             return cli_query(['listchannels', short_channel_id, source_node_id])
 
+    def listpeers(self):
+        if self.test_mode:
+            return file_content("tests/listpeers.txt")
+        else:
+            return cli_query(["listpeers"])
+
 
 class Node:
 
@@ -87,6 +93,7 @@ class Node:
         self.fees_collected = self.getinfo["msatoshi_fees_collected"] / 1000
         self.listfunds = clapi.listfunds()
         self.listchannels = clapi.listchannels("null", self.id)
+        self.listpeers = clapi.listpeers()
         self.channels = {}
         self.all_last_updates = []
 
@@ -102,6 +109,8 @@ class Node:
         self.total_input = 0
         self.total_output = 0
         self.channel_count = 0
+        self.in_payments = 0
+        self.out_payments = 0
         for channel_data in self.listfunds["channels"]:
             self.channel_count += 1
             total = channel_data["channel_total_sat"]
@@ -116,7 +125,9 @@ class Node:
                                   output=output,
                                   total=input + output,
                                   state=channel_data["state"],
-                                  last_update=NOW)
+                                  last_update=NOW,
+                                  in_payments=0,
+                                  out_payments=0)
             self.channels[short_channel_id] = channel
             self.total_input += input
             self.total_output += output
@@ -129,6 +140,17 @@ class Node:
             channel = self.channels[channel_id]
             channel.last_update = channel_data["last_update"]
             self.all_last_updates += [channel.last_update]
+        for peer_data in self.listpeers["peers"]:
+            for channel_data in peer_data["channels"]:
+                channel_id = channel_data["short_channel_id"]
+                if channel_id not in self.channels:
+                    print("channel {} not in listpeers".format(channel_id))
+                    continue
+                channel = self.channels[channel_id]
+                channel.in_payments = channel_data["in_payments_fulfilled"]
+                channel.out_payments = channel_data["out_payments_fulfilled"]
+                self.in_payments += channel.in_payments
+                self.out_payments += channel.out_payments
 
     def print_status(self, verbose=False):
         print("Wallet funds (BTC):")
@@ -139,12 +161,19 @@ class Node:
         for (channel_id, channel) in self.channels.items():
             input_str = "{:11.8f}".format(channel.input / SATS_PER_BTC) if channel.input else " -         "
             output_str = "{:11.8f}".format(channel.output / SATS_PER_BTC) if channel.output else " -         "
-            print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}".format(
+            payments_str = "{:8s} {:4d}".format(
+                "{:4d}-{:<d}".format(
+                    channel.in_payments,
+                    channel.out_payments),
+                channel.in_payments + channel.out_payments,
+            )
+            print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {}".format(
                 channel_id,
                 peer_id_string(channel.peer_id, verbose),
                 input_str,
                 output_str,
                 channel.total / SATS_PER_BTC,
+                payments_str,
                 channel.state,
                 age_string(channel.last_update)
             ))
@@ -155,6 +184,9 @@ class Node:
         print("- Grand total:   {:11.8f}".format(self.total / SATS_PER_BTC))
         tvl = self.total_output + self.total_wallet
         print("Node Value         : {:11.8f}".format(tvl / SATS_PER_BTC))
+        print("In payments        : {}".format(self.in_payments))
+        print("Out payments       : {}".format(self.out_payments))
+        print("Total payments     : {}".format(self.in_payments + self.out_payments))
         print("Fees collected     : {:14.11f}".format(self.fees_collected / SATS_PER_BTC))
         self.all_last_updates.sort()
         if len(self.all_last_updates) > 0:
