@@ -37,10 +37,10 @@ def age_string(timestamp):
     global NOW
     age = NOW - timestamp
     if age < DAY:
-        return "today"
+        return "   today"
     days = age // DAY
     if days == 1:
-        return "1 day"
+        return " 1 day"
     else:
         return "{:2d} days".format(days)
 
