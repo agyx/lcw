@@ -110,7 +110,7 @@ class Node:
                 self.wallet_value_unconfirmed += output["value"]
         self.total_wallet = self.wallet_value_confirmed + self.wallet_value_unconfirmed
 
-        self.total_input = 0
+        self.input_capacity = 0
         self.total_output = 0
         self.channel_count = 0
         self.in_payments = 0
@@ -137,11 +137,12 @@ class Node:
                                   last_update=NOW,
                                   in_payments=0,
                                   out_payments=0,
-                                  new_channel=new_channel)
+                                  new_channel=new_channel,
+                                  total_payments=0)
             self.channels[short_channel_id] = channel
-            self.total_input += input
+            self.input_capacity += input
             self.total_output += output
-        self.total = self.total_input + self.total_output
+        self.total = self.input_capacity + self.total_output
         for channel_data in self.listchannels["channels"]:
             channel_id = channel_data["short_channel_id"]
             if channel_id not in self.channels:
@@ -161,35 +162,44 @@ class Node:
                 channel = self.channels[channel_id]
                 channel.in_payments = channel_data["in_payments_fulfilled"]
                 channel.out_payments = channel_data["out_payments_fulfilled"]
+                channel.total_payments = channel.in_payments + channel.out_payments
                 self.in_payments += channel.in_payments
                 self.out_payments += channel.out_payments
+
         for (channel_id, channel) in self.channels.items():
             if channel.new_channel:
                 channel.funding_block = self.block_height
             else:
                 channel.funding_block = int(channel_id.split("x")[0])
+            channel.age = (self.block_height - channel.funding_block) * 600
+            if channel.age <= 0:
+                channel.tx_per_day = 0
+            else:
+                channel.tx_per_day = channel.total_payments / (channel.age / 86400)
 
-    def print_status(self, verbose=False):
+    def print_status(self, verbose=False, sort_key=None):
         print("Wallet funds (BTC):")
         print("- Confirmed:   {:11.8f}".format(self.wallet_value_confirmed / SATS_PER_BTC))
         print("- Unconfirmed: {:11.8f}".format(self.wallet_value_unconfirmed / SATS_PER_BTC))
         print("- TOTAL:       {:11.8f}".format(self.total_wallet / SATS_PER_BTC))
         print("Channels:")
-        for (channel_id, channel) in self.channels.items():
+        items = list(self.channels.items())
+        if sort_key is not None:
+            if sort_key.startswith("-"):
+                reverse = True
+                sort_key = sort_key[1:]
+            else:
+                reverse = False
+            items.sort(key=lambda item: item[1][sort_key], reverse=reverse)
+        for (channel_id, channel) in items:
             input_str = "{:11.8f}".format(channel.input / SATS_PER_BTC) if channel.input else " -         "
             output_str = "{:11.8f}".format(channel.output / SATS_PER_BTC) if channel.output else " -         "
-            total_payments = channel.in_payments + channel.out_payments
             payments_str = "{:8s} {:4d}".format(
                 "{:4d}-{:<d}".format(
                     channel.in_payments,
                     channel.out_payments),
-                total_payments,
+                channel.total_payments,
             )
-            age = (self.block_height - channel.funding_block) * 600
-            if age <= 0:
-                tx_per_day = 0
-            else:
-                tx_per_day = total_payments / (age / 86400)
             print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {:5.1f}  {}".format(
                 channel_id,
                 peer_id_string(channel.peer_id, verbose),
@@ -197,22 +207,25 @@ class Node:
                 output_str,
                 channel.total / SATS_PER_BTC,
                 payments_str,
-                age_string2(age),
-                tx_per_day,
+                age_string2(channel.age),
+                channel.tx_per_day,
                 # age_string(channel.last_update),
                 channel.state,
             ))
-        print("Channels summary:")
-        print("- # of channels:  {}".format(self.channel_count))
-        print("- Total input:   {:11.8f}".format(self.total_input / SATS_PER_BTC))
-        print("- Total output:  {:11.8f}".format(self.total_output / SATS_PER_BTC))
-        print("- Grand total:   {:11.8f}".format(self.total / SATS_PER_BTC))
+        print("Node summary:")
+        print("- # of channels  : {}".format(self.channel_count))
+        print("- Capacity       : I: {:.8f} / O: {:.8f}  T: {:.8f}".format(
+            self.input_capacity / SATS_PER_BTC,
+            self.total_output / SATS_PER_BTC,
+            self.total / SATS_PER_BTC))
+        print("- # of payments  : I: {} / O: {}  T: {}".format(
+            self.in_payments,
+            self.out_payments,
+            self.in_payments + self.out_payments
+        ))
         tvl = self.total_output + self.total_wallet
-        print("Node Value         : {:11.8f}".format(tvl / SATS_PER_BTC))
-        print("In payments        : {}".format(self.in_payments))
-        print("Out payments       : {}".format(self.out_payments))
-        print("Total payments     : {}".format(self.in_payments + self.out_payments))
-        print("Fees collected     : {:14.11f}".format(self.fees_collected / SATS_PER_BTC))
+        print("- Node Value     : {:11.8f}".format(tvl / SATS_PER_BTC))
+        print("- Fees collected : {:14.11f}".format(self.fees_collected / SATS_PER_BTC))
         # self.all_last_updates.sort()
         # if len(self.all_last_updates) > 0:
         #     median_index = len(self.all_last_updates) // 2
@@ -233,13 +246,18 @@ parser.add_option("-v", "--verbose",
                   action="store_true", dest="verbose", default=False,
                   help="Verbose")
 
+parser.add_option("-s", "--sort",
+                  action="store", type="string", dest="sort_key", default=None,
+                  help="Sort channels with provided key")
+
 (options, args) = parser.parse_args()
 
 clapi = CLightning(test_mode=options.test_mode)
 
 my_node = Node()
 
-my_node.print_status(verbose=options.verbose)
+my_node.print_status(verbose=options.verbose,
+                     sort_key=options.sort_key)
 
 
 """
