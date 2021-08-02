@@ -111,7 +111,7 @@ class Node:
         self.total_wallet = self.wallet_value_confirmed + self.wallet_value_unconfirmed
 
         self.input_capacity = 0
-        self.total_output = 0
+        self.output_capacity = 0
         self.channel_count = 0
         self.in_payments = 0
         self.out_payments = 0
@@ -130,9 +130,9 @@ class Node:
                 self.new_channels += 1
                 new_channel = True
             channel = munch.Munch(peer_id=channel_data["peer_id"],
-                                  input=input,
-                                  output=output,
-                                  total=input + output,
+                                  input_capacity=input,
+                                  output_capacity=output,
+                                  total_capacity=input + output,
                                   state=channel_data["state"],
                                   last_update=NOW,
                                   in_payments=0,
@@ -141,12 +141,12 @@ class Node:
                                   total_payments=0)
             self.channels[short_channel_id] = channel
             self.input_capacity += input
-            self.total_output += output
-        self.total = self.input_capacity + self.total_output
+            self.output_capacity += output
+        self.total = self.input_capacity + self.output_capacity
         for channel_data in self.listchannels["channels"]:
             channel_id = channel_data["short_channel_id"]
             if channel_id not in self.channels:
-                print("channel {} not in listfunds".format(channel_id))
+                print("unknown channel {} in listfunds".format(channel_id))
                 continue
             channel = self.channels[channel_id]
             channel.last_update = channel_data["last_update"]
@@ -157,7 +157,7 @@ class Node:
                     continue
                 channel_id = channel_data["short_channel_id"]
                 if channel_id not in self.channels:
-                    print("channel {} not in listpeers".format(channel_id))
+                    print("unknown channel {} in listpeers".format(channel_id))
                     continue
                 channel = self.channels[channel_id]
                 channel.in_payments = channel_data["in_payments_fulfilled"]
@@ -176,6 +176,10 @@ class Node:
                 channel.tx_per_day = 0
             else:
                 channel.tx_per_day = channel.total_payments / (channel.age / 86400)
+            if channel.output_capacity == 0:
+                channel.used_capacity = 0
+            else:
+                channel.used_capacity = channel.tx_per_day / channel.output_capacity * SATS_PER_BTC
 
     def print_status(self, verbose=False, sort_key=None):
         print("Wallet funds (BTC):")
@@ -192,23 +196,24 @@ class Node:
                 reverse = False
             items.sort(key=lambda item: item[1][sort_key], reverse=reverse)
         for (channel_id, channel) in items:
-            input_str = "{:11.8f}".format(channel.input / SATS_PER_BTC) if channel.input else " -         "
-            output_str = "{:11.8f}".format(channel.output / SATS_PER_BTC) if channel.output else " -         "
+            input_str = "{:11.8f}".format(channel.input_capacity / SATS_PER_BTC) if channel.input_capacity else " -         "
+            output_str = "{:11.8f}".format(channel.output_capacity / SATS_PER_BTC) if channel.output_capacity else " -         "
             payments_str = "{:8s} {:4d}".format(
                 "{:4d}-{:<d}".format(
                     channel.in_payments,
                     channel.out_payments),
                 channel.total_payments,
             )
-            print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {:5.1f}  {}".format(
+            print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {:5.1f}  {:8.1f}  {}".format(
                 channel_id,
                 peer_id_string(channel.peer_id, verbose),
                 input_str,
                 output_str,
-                channel.total / SATS_PER_BTC,
+                channel.total_capacity / SATS_PER_BTC,
                 payments_str,
                 age_string2(channel.age),
                 channel.tx_per_day,
+                channel.used_capacity,
                 # age_string(channel.last_update),
                 channel.state,
             ))
@@ -216,14 +221,14 @@ class Node:
         print("- # of channels  : {}".format(self.channel_count))
         print("- Capacity       : I: {:.8f} / O: {:.8f}  T: {:.8f}".format(
             self.input_capacity / SATS_PER_BTC,
-            self.total_output / SATS_PER_BTC,
+            self.output_capacity / SATS_PER_BTC,
             self.total / SATS_PER_BTC))
         print("- # of payments  : I: {} / O: {}  T: {}".format(
             self.in_payments,
             self.out_payments,
             self.in_payments + self.out_payments
         ))
-        tvl = self.total_output + self.total_wallet
+        tvl = self.output_capacity + self.total_wallet
         print("- Node Value     : {:11.8f}".format(tvl / SATS_PER_BTC))
         print("- Fees collected : {:14.11f}".format(self.fees_collected / SATS_PER_BTC))
         # self.all_last_updates.sort()
