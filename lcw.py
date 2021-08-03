@@ -13,13 +13,17 @@ SATS_PER_BTC = 100000000
 CLI_LIGHTNING_COMMAND = None
 DAY = 86400
 NOW = int(time.time())
+LCW_DATA_PATH = os.getenv("HOME") + "/.lcwdata.json"
 
 
 def file_content(path):
-    file = open(path, mode="r")
-    content = file.read()
-    file.close()
-    return json.loads(content)
+    try:
+        file = open(path, mode="r")
+        content = file.read()
+        file.close()
+        return json.loads(content)
+    except Exception:
+        return None
 
 
 def cli_query(params):
@@ -240,6 +244,20 @@ class Node:
         #         median_value = self.all_last_updates[median_index]
         #     print("Median last update : {:4.1f} days".format((NOW - median_value) / DAY))
 
+    def store(self):
+        stored_data = file_content(LCW_DATA_PATH)
+        if stored_data is None:
+            stored_json = {}
+        else:
+            stored_json = stored_data
+        today = time.strftime("%Y%m%d", time.localtime(int(time.time())))
+        if today in stored_json:
+            print("today's data is alrady stored")
+            return
+        stored_json[today] = self.channels
+        file = open(LCW_DATA_PATH, "w")
+        file.write(json.dumps(stored_json))
+
 
 parser = OptionParser()
 
@@ -255,15 +273,24 @@ parser.add_option("-s", "--sort",
                   action="store", type="string", dest="sort_key", default=None,
                   help="Sort channels with provided key")
 
+parser.add_option("", "--command",
+                  action="store", type="string", dest="command", default="status",
+                  help="store: Store current channels information into json history file"
+                       "status:"
+                  )
+
 (options, args) = parser.parse_args()
 
 clapi = CLightning(test_mode=options.test_mode)
 
 my_node = Node()
 
-my_node.print_status(verbose=options.verbose,
-                     sort_key=options.sort_key)
 
+if options.command == "store":
+    my_node.store()
+elif options.command == "status":
+    my_node.print_status(verbose=options.verbose,
+                         sort_key=options.sort_key)
 
 """
 print(clapi.getinfo())
