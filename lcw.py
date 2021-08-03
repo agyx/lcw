@@ -63,6 +63,14 @@ def peer_id_string(peer_id, verbose=False):
         )
 
 
+def day(days_ago=0):
+    return time.strftime("%Y%m%d", time.localtime(NOW - days_ago * 86400))
+
+
+def timestamp_from_day(day):
+    return int(time.mktime(time.strptime(day + " 00:00:00", '%Y%m%d %H:%M:%S')))
+
+
 class CLightning:
 
     def __init__(self, test_mode=False):
@@ -95,7 +103,17 @@ class CLightning:
 
 class Node:
 
-    def __init__(self):
+    def __init__(self, since=None):
+        data_stored = file_content(LCW_DATA_PATH)
+        self.data_stored = None
+        self.date_ref = None
+        self.since = None
+        if since is not None and data_stored is not None:
+            self.date_ref = day(since)
+            if self.date_ref in data_stored:
+                self.data_stored = data_stored[self.date_ref]
+                self.period = NOW - timestamp_from_day(self.date_ref)
+                self.since = since
         self.getinfo = clapi.getinfo()
         self.id = self.getinfo["id"]
         self.fees_collected = self.getinfo["msatoshi_fees_collected"] / 1000
@@ -166,31 +184,51 @@ class Node:
                 channel = self.channels[channel_id]
                 channel.in_payments = channel_data["in_payments_fulfilled"]
                 channel.out_payments = channel_data["out_payments_fulfilled"]
+                channel_ref = self.get_channel_ref(channel_id)
+                if channel_ref is not None:
+                    # print(data_stored)
+                    # print("{} {} {} {}".format(channel.in_payments,
+                    #                           channel.out_payments,
+                    #                           channel_ref["in_payments"],
+                    #                           channel_ref["out_payments"]))
+                    channel.in_payments -= channel_ref["in_payments"]
+                    channel.out_payments -= channel_ref["out_payments"]
                 channel.total_payments = channel.in_payments + channel.out_payments
                 self.in_payments += channel.in_payments
                 self.out_payments += channel.out_payments
 
         for (channel_id, channel) in self.channels.items():
+            channel_ref = self.get_channel_ref(channel_id)
             if channel.new_channel:
                 channel.funding_block = self.block_height
             else:
                 channel.funding_block = int(channel_id.split("x")[0])
             channel.age = (self.block_height - channel.funding_block) * 600
-            if channel.age <= 0:
+            if channel_ref is not None:
+                period = self.period
+            else:
+                period = channel.age
+            if period <= 0:
                 channel.tx_per_day = 0
             else:
-                channel.tx_per_day = channel.total_payments / (channel.age / 86400)
+                channel.tx_per_day = channel.total_payments / (period / 86400)
             if channel.output_capacity == 0:
                 channel.used_capacity = 1000
             else:
                 channel.used_capacity = channel.tx_per_day / channel.output_capacity * SATS_PER_BTC
+
+    def get_channel_ref(self, channel_id):
+        if self.data_stored is not None and channel_id in self.data_stored:
+            return self.data_stored[channel_id]
+        else:
+            return None
 
     def print_status(self, verbose=False, sort_key=None):
         print("Wallet funds (BTC):")
         print("- Confirmed:   {:11.8f}".format(self.wallet_value_confirmed / SATS_PER_BTC))
         print("- Unconfirmed: {:11.8f}".format(self.wallet_value_unconfirmed / SATS_PER_BTC))
         print("- TOTAL:       {:11.8f}".format(self.total_wallet / SATS_PER_BTC))
-        print("Channels:")
+        print("Channels: " + ("(ref: {} days ago)".format(self.since) if self.since is not None else ""))
         items = list(self.channels.items())
         if sort_key is not None:
             if sort_key.startswith("-"):
@@ -250,13 +288,14 @@ class Node:
             stored_json = {}
         else:
             stored_json = stored_data
-        today = time.strftime("%Y%m%d", time.localtime(int(time.time())))
+        today = day()
         if today in stored_json:
-            print("today's data is alrady stored")
+            print("today's data is alresady stored")
             return
         stored_json[today] = self.channels
         file = open(LCW_DATA_PATH, "w")
         file.write(json.dumps(stored_json))
+        file.close()
 
 
 parser = OptionParser()
@@ -273,6 +312,10 @@ parser.add_option("-s", "--sort",
                   action="store", type="string", dest="sort_key", default=None,
                   help="Sort channels with provided key")
 
+parser.add_option("", "--since",
+                  action="store", type="int", dest="since", default=None,
+                  help="Sort channels with provided key")
+
 parser.add_option("", "--command",
                   action="store", type="string", dest="command", default="status",
                   help="store: Store current channels information into json history file"
@@ -283,7 +326,7 @@ parser.add_option("", "--command",
 
 clapi = CLightning(test_mode=options.test_mode)
 
-my_node = Node()
+my_node = Node(since=options.since)
 
 
 if options.command == "store":
