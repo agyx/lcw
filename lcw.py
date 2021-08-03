@@ -177,7 +177,7 @@ class Node:
             else:
                 channel.tx_per_day = channel.total_payments / (channel.age / 86400)
             if channel.output_capacity == 0:
-                channel.used_capacity = 0
+                channel.used_capacity = 1000
             else:
                 channel.used_capacity = channel.tx_per_day / channel.output_capacity * SATS_PER_BTC
 
