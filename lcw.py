@@ -59,7 +59,7 @@ def peer_id_string(peer_id, verbose=False):
     else:
         return "{}...{}".format(
             peer_id[:8],
-            peer_id[-9:-1],
+            peer_id[-8:],
         )
 
 
@@ -104,16 +104,17 @@ class CLightning:
 class Node:
 
     def __init__(self, since=None):
-        data_stored = file_content(LCW_DATA_PATH)
         self.data_stored = None
         self.date_ref = None
         self.since = None
-        if since is not None and data_stored is not None:
-            self.date_ref = day(since)
-            if self.date_ref in data_stored:
-                self.data_stored = data_stored[self.date_ref]
-                self.period = NOW - timestamp_from_day(self.date_ref)
-                self.since = since
+        if since is not None:
+            data_stored = file_content(LCW_DATA_PATH)
+            if data_stored is not None:
+                self.date_ref = day(since)
+                if self.date_ref in data_stored:
+                    self.data_stored = data_stored[self.date_ref]
+                    self.period = NOW - timestamp_from_day(self.date_ref)
+                    self.since = since
         self.getinfo = clapi.getinfo()
         self.id = self.getinfo["id"]
         self.fees_collected = self.getinfo["msatoshi_fees_collected"] / 1000
@@ -330,8 +331,10 @@ parser.add_option("", "--command",
 
 clapi = CLightning(test_mode=options.test_mode)
 
-my_node = Node(since=options.since)
+if options.command == "store":
+    options.since = None
 
+my_node = Node(since=options.since)
 
 if options.command == "store":
     my_node.store()
