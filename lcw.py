@@ -8,7 +8,6 @@ import munch
 import time
 from optparse import OptionParser
 
-
 SATS_PER_BTC = 100000000
 CLI_LIGHTNING_COMMAND = None
 DAY = 86400
@@ -100,6 +99,12 @@ class CLightning:
         else:
             return cli_query(["listpeers"])
 
+    def setchannelfee(self, id, base, ppm):
+        if self.test_mode:
+            return {}
+        else:
+            return cli_query(["setchannelfee", id, str(base), str(ppm)])
+
 
 class Node:
 
@@ -163,7 +168,9 @@ class Node:
                                   in_msatoshi_fulfilled=0,
                                   out_msatoshi_fulfilled=0,
                                   new_channel=new_channel,
-                                  total_payments=0)
+                                  total_payments=0,
+                                  base_fee_msat=0,
+                                  ppm_fee=0)
             self.channels[short_channel_id] = channel
             self.input_capacity += input
             self.output_capacity += output
@@ -176,6 +183,8 @@ class Node:
             channel = self.channels[channel_id]
             channel.last_update = channel_data["last_update"]
             self.all_last_updates += [channel.last_update]
+            channel.base_fee_msat = channel_data["base_fee_millisatoshi"]
+            channel.ppm_fee = channel_data["fee_per_millionth"]
         for peer_data in self.listpeers["peers"]:
             for channel_data in peer_data["channels"]:
                 if "short_channel_id" not in channel_data:
@@ -228,6 +237,29 @@ class Node:
         else:
             return None
 
+    def set_fees(self, min_base, min_ppm, max_base, max_ppm):
+        for (channel_id, channel) in self.channels.items():
+            out_percent = channel.output_capacity / (channel.input_capacity + channel.output_capacity) * 100
+            if channel.base_fee_msat == 0 and channel.ppm_fee == 0:
+                new_base_fee = 0
+                new_ppm_fee = 0
+            elif out_percent <= 10:
+                new_base_fee = max_base
+                new_ppm_fee = max_ppm
+            elif out_percent <= 40:
+                new_base_fee = (7 * min_base + max_base) // 8
+                new_ppm_fee = (7 * min_ppm + max_ppm) // 8
+            else:
+                new_base_fee = min_base
+                new_ppm_fee = min_ppm
+            print("{:13s} {:4.0f}%  {:5d}/{:5d} -> {:5d}/{:5d}".format(channel_id,
+                                                                       out_percent,
+                                                                       channel.base_fee_msat,
+                                                                       channel.ppm_fee,
+                                                                       new_base_fee,
+                                                                       new_ppm_fee))
+            clapi.setchannelfee(channel_id, new_base_fee, new_ppm_fee)
+
     def print_status(self, verbose=False, sort_key=None):
         print("Wallet funds (BTC):")
         print("- Confirmed:   {:11.8f}".format(self.wallet_value_confirmed / SATS_PER_BTC))
@@ -243,15 +275,17 @@ class Node:
                 reverse = False
             items.sort(key=lambda item: item[1][sort_key], reverse=reverse)
         for (channel_id, channel) in items:
-            input_str = "{:11.8f}".format(channel.input_capacity / SATS_PER_BTC) if channel.input_capacity else " -         "
-            output_str = "{:11.8f}".format(channel.output_capacity / SATS_PER_BTC) if channel.output_capacity else " -         "
+            input_str = "{:11.8f}".format(
+                channel.input_capacity / SATS_PER_BTC) if channel.input_capacity else " -         "
+            output_str = "{:11.8f}".format(
+                channel.output_capacity / SATS_PER_BTC) if channel.output_capacity else " -         "
             payments_str = "{:8s} {:4d}".format(
                 "{:4d}-{:<d}".format(
                     channel.in_payments,
                     channel.out_payments),
                 channel.total_payments,
             )
-            print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {:5.1f}  {:8.1f}  {}".format(
+            print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {:5.1f}  {:8.1f}  {} ({}/{})".format(
                 channel_id,
                 peer_id_string(channel.peer_id, verbose),
                 input_str,
@@ -263,6 +297,8 @@ class Node:
                 channel.used_capacity,
                 # age_string(channel.last_update),
                 channel.state,
+                channel.base_fee_msat,
+                channel.ppm_fee
             ))
         print("Node summary:")
         print("- # of channels  : {}".format(self.channel_count))
@@ -321,10 +357,15 @@ parser.add_option("", "--since",
                   action="store", type="int", dest="since", default=None,
                   help="Sort channels with provided key")
 
+parser.add_option("-f", "--fees",
+                  action="store", type="string", dest="fees", default="1/10/1/1000",
+                  help="Sort channels with provided key")
+
 parser.add_option("", "--command",
                   action="store", type="string", dest="command", default="status",
                   help="store: Store current channels information into json history file"
                        "status:"
+                       "setfees:"
                   )
 
 (options, args) = parser.parse_args()
@@ -338,6 +379,9 @@ my_node = Node(since=options.since)
 
 if options.command == "store":
     my_node.store()
+elif options.command == "setfees":
+    fees = options.fees.split("/")
+    my_node.set_fees(int(fees[0]), int(fees[1]), int(fees[2]), int(fees[3]))
 elif options.command == "status":
     my_node.print_status(verbose=options.verbose,
                          sort_key=options.sort_key)
