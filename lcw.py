@@ -252,13 +252,18 @@ class Node:
             else:
                 new_base_fee = min_base
                 new_ppm_fee = min_ppm
-            print("{:13s} {:4.0f}%  {:5d}/{:5d} -> {:5d}/{:5d}".format(channel_id,
-                                                                       out_percent,
-                                                                       channel.base_fee_msat,
-                                                                       channel.ppm_fee,
-                                                                       new_base_fee,
-                                                                       new_ppm_fee))
-            clapi.setchannelfee(channel_id, new_base_fee, new_ppm_fee)
+            if new_base_fee == channel.base_fee_msat and new_ppm_fee == channel.ppm_fee:
+                status = "(no change)"
+            else:
+                clapi.setchannelfee(channel_id, new_base_fee, new_ppm_fee)
+                status = "(updated)"
+            print("{:13s} {:4.0f}%  {:5d}/{:5d} -> {:5d}/{:5d}  {}".format(channel_id,
+                                                                           out_percent,
+                                                                           channel.base_fee_msat,
+                                                                           channel.ppm_fee,
+                                                                           new_base_fee,
+                                                                           new_ppm_fee,
+                                                                           status))
 
     def print_status(self, verbose=False, sort_key=None):
         print("Wallet funds (BTC):")
