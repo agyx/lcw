@@ -306,19 +306,15 @@ class Node:
                 channel.ppm_fee
             ))
         print("Node summary:")
-        print("- # of channels  : {}".format(self.channel_count))
-        print("- Capacity       : I: {:.8f} / O: {:.8f}  T: {:.8f}".format(
+        print("- # of channels   : {}".format(self.channel_count))
+        print("- Capacity        : {:.8f} ({:.8f} + {:.8f})".format(
+            self.total / SATS_PER_BTC,
             self.input_capacity / SATS_PER_BTC,
-            self.output_capacity / SATS_PER_BTC,
-            self.total / SATS_PER_BTC))
-        print("- # of payments  : I: {} / O: {}  T: {}".format(
-            self.in_payments,
-            self.out_payments,
-            self.in_payments + self.out_payments
-        ))
+            self.output_capacity / SATS_PER_BTC))
+        print("- Routed payments : {}".format(self.in_payments))
         tvl = self.output_capacity + self.total_wallet
-        print("- Node Value     : {:11.8f}".format(tvl / SATS_PER_BTC))
-        print("- Fees collected : {:14.11f}".format(self.fees_collected / SATS_PER_BTC))
+        print("- Node Value      : {:.8f} BTC".format(tvl / SATS_PER_BTC))
+        print("- Fees collected  : {:.0f} sats".format(self.fees_collected))
         # self.all_last_updates.sort()
         # if len(self.all_last_updates) > 0:
         #     median_index = len(self.all_last_updates) // 2
