@@ -241,8 +241,8 @@ class Node:
         for (channel_id, channel) in self.channels.items():
             out_percent = channel.output_capacity / (channel.input_capacity + channel.output_capacity) * 100
             if channel.base_fee_msat == 0 and channel.ppm_fee == 0:
-                new_base_fee = 0
-                new_ppm_fee = 0
+                print("{:13s} skipped".format(channel_id))
+                continue
             elif out_percent <= 10:
                 new_base_fee = max_base
                 new_ppm_fee = max_ppm
