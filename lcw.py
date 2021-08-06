@@ -253,17 +253,14 @@ class Node:
                 new_base_fee = min_base
                 new_ppm_fee = min_ppm
             if new_base_fee == channel.base_fee_msat and new_ppm_fee == channel.ppm_fee:
-                status = "(no change)"
-            else:
-                clapi.setchannelfee(channel_id, new_base_fee, new_ppm_fee)
-                status = "(updated)"
-            print("{:13s} {:4.0f}%  {:5d}/{:5d} -> {:5d}/{:5d}  {}".format(channel_id,
-                                                                           out_percent,
-                                                                           channel.base_fee_msat,
-                                                                           channel.ppm_fee,
-                                                                           new_base_fee,
-                                                                           new_ppm_fee,
-                                                                           status))
+                continue
+            clapi.setchannelfee(channel_id, new_base_fee, new_ppm_fee)
+            print("{:13s} {:4.0f}%  {:5d}/{:5d} -> {:5d}/{:5d}".format(channel_id,
+                                                                       out_percent,
+                                                                       channel.base_fee_msat,
+                                                                       channel.ppm_fee,
+                                                                       new_base_fee,
+                                                                       new_ppm_fee))
 
     def print_status(self, verbose=False, sort_key=None):
         print("Wallet funds (BTC):")
@@ -323,6 +320,7 @@ class Node:
         #     else:
         #         median_value = self.all_last_updates[median_index]
         #     print("Median last update : {:4.1f} days".format((NOW - median_value) / DAY))
+        print()
 
     def store(self):
         stored_data = file_content(LCW_DATA_PATH)
@@ -359,8 +357,8 @@ parser.add_option("", "--since",
                   help="Payments and derived stats are counted from given # of days")
 
 parser.add_option("-f", "--fees",
-                  action="store", type="string", dest="fees", default="1/10/1/1000",
-                  help="Set fees from a string <min_base>/<min_ppm>/<max_base>/<max_ppm> def: 1/10/1/1000")
+                  action="store", type="string", dest="fees", default="1/10/1/500",
+                  help="Set fees from a string <min_base>/<min_ppm>/<max_base>/<max_ppm> def: 1/10/1/500")
 
 parser.add_option("", "--command",
                   action="store", type="string", dest="command", default="status",
