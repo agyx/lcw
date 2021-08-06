@@ -246,7 +246,7 @@ class Node:
             elif out_percent <= 10:
                 new_base_fee = max_base
                 new_ppm_fee = max_ppm
-            elif out_percent <= 40:
+            elif out_percent <= 25:
                 new_base_fee = (7 * min_base + max_base) // 8
                 new_ppm_fee = (7 * min_ppm + max_ppm) // 8
             else:
@@ -356,11 +356,11 @@ parser.add_option("-s", "--sort",
 
 parser.add_option("", "--since",
                   action="store", type="int", dest="since", default=None,
-                  help="Sort channels with provided key")
+                  help="Payments and derived stats are counted from given # of days")
 
 parser.add_option("-f", "--fees",
                   action="store", type="string", dest="fees", default="1/10/1/1000",
-                  help="Sort channels with provided key")
+                  help="Set fees from a string <min_base>/<min_ppm>/<max_base>/<max_ppm> def: 1/10/1/1000")
 
 parser.add_option("", "--command",
                   action="store", type="string", dest="command", default="status",
@@ -373,7 +373,7 @@ parser.add_option("", "--command",
 
 clapi = CLightning(test_mode=options.test_mode)
 
-if options.command == "store":
+if options.command != "status":
     options.since = None
 
 my_node = Node(since=options.since)
