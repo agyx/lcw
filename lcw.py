@@ -270,7 +270,7 @@ class Node:
         print("Channels: " + ("(ref: {} days ago)".format(self.since) if self.since is not None else ""))
         items = list(self.channels.items())
         if sort_key is not None:
-            if sort_key.startswith("-"):
+            if sort_key.startswith("/"):
                 reverse = True
                 sort_key = sort_key[1:]
             else:
@@ -357,7 +357,7 @@ parser.add_option("", "--since",
                   help="Payments and derived stats are counted from given # of days")
 
 parser.add_option("-f", "--fees",
-                  action="store", type="string", dest="fees", default="1/10/1/500",
+                  action="store", type="string", dest="fees", default="0/10/0/500",
                   help="Set fees from a string <min_base>/<min_ppm>/<max_base>/<max_ppm> def: 1/10/1/500")
 
 parser.add_option("", "--command",
