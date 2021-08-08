@@ -237,29 +237,29 @@ class Node:
         else:
             return None
 
-    def set_fees(self, min_base, min_ppm, max_base, max_ppm):
+    def set_fees(self, ppm0, ppm1, ppm2, ppm3):
+        DEFAULT_BASE_FEE = 0
         for (channel_id, channel) in self.channels.items():
             out_percent = channel.output_capacity / (channel.input_capacity + channel.output_capacity) * 100
-            if channel.base_fee_msat == 0 and channel.ppm_fee == 0:
+            if channel.ppm_fee == 0:
                 print("{:13s} skipped".format(channel_id))
                 continue
             elif out_percent <= 10:
-                new_base_fee = max_base
-                new_ppm_fee = max_ppm
+                new_ppm_fee = ppm3
             elif out_percent <= 25:
-                new_base_fee = (7 * min_base + max_base) // 8
-                new_ppm_fee = (7 * min_ppm + max_ppm) // 8
+                new_ppm_fee = ppm2
+            elif out_percent <= 50:
+                new_ppm_fee = ppm1
             else:
-                new_base_fee = min_base
-                new_ppm_fee = min_ppm
-            if new_base_fee == channel.base_fee_msat and new_ppm_fee == channel.ppm_fee:
+                new_ppm_fee = ppm0
+            if channel.base_fee_msat == DEFAULT_BASE_FEE and new_ppm_fee == channel.ppm_fee:
                 continue
-            clapi.setchannelfee(channel_id, new_base_fee, new_ppm_fee)
+            clapi.setchannelfee(channel_id, DEFAULT_BASE_FEE, new_ppm_fee)
             print("{:13s} {:4.0f}%  {:5d}/{:5d} -> {:5d}/{:5d}".format(channel_id,
                                                                        out_percent,
                                                                        channel.base_fee_msat,
                                                                        channel.ppm_fee,
-                                                                       new_base_fee,
+                                                                       DEFAULT_BASE_FEE,
                                                                        new_ppm_fee))
 
     def print_status(self, verbose=False, sort_key=None):
@@ -357,8 +357,10 @@ parser.add_option("", "--since",
                   help="Payments and derived stats are counted from given # of days")
 
 parser.add_option("-f", "--fees",
-                  action="store", type="string", dest="fees", default="0/10/0/500",
-                  help="Set fees from a string <min_base>/<min_ppm>/<max_base>/<max_ppm> def: 1/10/1/500")
+                  action="store", type="string", dest="fees", default="10/20/150/1000",
+                  help="Set fees from a string <ppm0>/<ppm1>/<ppm2>/<ppm3> respectively"
+                       "for quartiles 100%/50%/25%/10% of %out payments."
+                       "Base fee is always 0")
 
 parser.add_option("", "--command",
                   action="store", type="string", dest="command", default="status",
