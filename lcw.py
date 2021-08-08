@@ -237,11 +237,11 @@ class Node:
         else:
             return None
 
-    def set_fees(self, ppm0, ppm1, ppm2, ppm3):
+    def set_fees(self, force, ppm0, ppm1, ppm2, ppm3):
         DEFAULT_BASE_FEE = 0
         for (channel_id, channel) in self.channels.items():
             out_percent = channel.output_capacity / (channel.input_capacity + channel.output_capacity) * 100
-            if channel.ppm_fee == 0:
+            if channel.ppm_fee == 0 and not force:
                 print("{:13s} skipped".format(channel_id))
                 continue
             elif out_percent <= 10:
@@ -348,6 +348,10 @@ parser.add_option("-v", "--verbose",
                   action="store_true", dest="verbose", default=False,
                   help="Verbose")
 
+parser.add_option("", "--force",
+                  action="store_true", dest="force", default=False,
+                  help="Do not skip 0 fees settings")
+
 parser.add_option("-s", "--sort",
                   action="store", type="string", dest="sort_key", default=None,
                   help="Sort channels with provided key")
@@ -382,7 +386,7 @@ if options.command == "store":
     my_node.store()
 elif options.command == "setfees":
     fees = options.fees.split("/")
-    my_node.set_fees(int(fees[0]), int(fees[1]), int(fees[2]), int(fees[3]))
+    my_node.set_fees(options.force, int(fees[0]), int(fees[1]), int(fees[2]), int(fees[3]))
 elif options.command == "status":
     my_node.print_status(verbose=options.verbose,
                          sort_key=options.sort_key)
