@@ -44,12 +44,14 @@ def age_string(timestamp):
 def age_string2(age_seconds):
     age = age_seconds
     if age < DAY:
-        return "   today"
+        return "   today "
     days = age // DAY
     if days == 1:
-        return " 1 day  "
+        return " 1 day   "
+    elif days < 90:
+        return "{:2d} days  ".format(days)
     else:
-        return "{:2d} days ".format(days)
+        return "{:2d} months".format((days+15) // 30)
 
 
 def peer_id_string(peer_id, verbose=False):
