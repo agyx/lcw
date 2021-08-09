@@ -236,7 +236,7 @@ class Node:
                     channel.out_payments -= channel_ref["out_payments"]
                     channel.in_msatoshi_fulfilled -= channel_ref["in_msatoshi_fulfilled"]
                     channel.out_msatoshi_fulfilled -= channel_ref["out_msatoshi_fulfilled"]
-                channel.routed_amount = channel.in_msatoshi_fulfilled + channel.out_msatoshi_fulfilled
+                channel.routed_amount = (channel.in_msatoshi_fulfilled + channel.out_msatoshi_fulfilled) / 1000
                 channel.routed_capacity = channel.routed_amount / channel.total_capacity
                 channel.total_payments = channel.in_payments + channel.out_payments
                 self.in_payments += channel.in_payments
@@ -340,7 +340,7 @@ class Node:
                     channel.out_payments),
                 channel.total_payments,
             )
-            print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {:5.1f}  {:4.2f}  {} ({}/{})".format(
+            print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {:5.1f}  {:6.2f}  {} ({}/{})".format(
                 channel_id,
                 peer_id_string(channel.alias, channel.peer_id, verbosity),
                 input_str,
