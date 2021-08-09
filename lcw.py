@@ -196,7 +196,8 @@ class Node:
                                   total_payments=0,
                                   base_fee_msat=0,
                                   ppm_fee=0,
-                                  alias="?")
+                                  alias="?",
+                                  routed_amount=0)
             self.channels[short_channel_id] = channel
             self.input_capacity += input
             self.output_capacity += output
@@ -235,6 +236,7 @@ class Node:
                     channel.out_payments -= channel_ref["out_payments"]
                     channel.in_msatoshi_fulfilled -= channel_ref["in_msatoshi_fulfilled"]
                     channel.out_msatoshi_fulfilled -= channel_ref["out_msatoshi_fulfilled"]
+                channel.routed_amount = channel.in_msatoshi_fulfilled + channel.out_msatoshi_fulfilled
                 channel.total_payments = channel.in_payments + channel.out_payments
                 self.in_payments += channel.in_payments
                 self.out_payments += channel.out_payments
@@ -254,10 +256,10 @@ class Node:
                 channel.tx_per_day = 0
             else:
                 channel.tx_per_day = channel.total_payments / (period / 86400)
-            if channel.output_capacity == 0:
-                channel.used_capacity = 1000
-            else:
-                channel.used_capacity = channel.tx_per_day / channel.output_capacity * SATS_PER_BTC
+            #if channel.output_capacity == 0:
+            #    channel.used_capacity = 1000
+            #else:
+            #    channel.used_capacity = channel.tx_per_day / channel.output_capacity * SATS_PER_BTC
         # add aliases
         self.listnodes = clapi.listnodes()["nodes"]
         self.hashed_listnodes = {}
@@ -337,7 +339,7 @@ class Node:
                     channel.out_payments),
                 channel.total_payments,
             )
-            print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {:5.1f}  {:8.1f}  {} ({}/{})".format(
+            print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {:5.1f}  {:6.3f}  {} ({}/{})".format(
                 channel_id,
                 peer_id_string(channel.alias, channel.peer_id, verbosity),
                 input_str,
@@ -346,7 +348,7 @@ class Node:
                 payments_str,
                 age_string2(channel.age),
                 channel.tx_per_day,
-                channel.used_capacity,
+                channel.routed_amount / 1000 / SATS_PER_BTC,
                 # age_string(channel.last_update),
                 channel.state,
                 channel.base_fee_msat,
