@@ -278,7 +278,7 @@ class Node:
                                                                        DEFAULT_BASE_FEE,
                                                                        new_ppm_fee))
 
-    def print_status(self, verbosity=0, sort_key=None):
+    def print_status(self, verbosity=0, sort_key=None, limit=0):
         print("Wallet funds (BTC):")
         print("- Confirmed:   {:11.8f}".format(self.wallet_value_confirmed / SATS_PER_BTC))
         print("- Unconfirmed: {:11.8f}".format(self.wallet_value_unconfirmed / SATS_PER_BTC))
@@ -292,12 +292,17 @@ class Node:
             else:
                 reverse = False
             items.sort(key=lambda item: item[1][sort_key], reverse=reverse)
+        count = 0
         for (channel_id, channel) in items:
+            if limit > 0:
+                if count >= limit:
+                    break
             if verbosity == 0:
                 if channel.state != "CHANNELD_NORMAL":
                     pass
                 elif channel.total_payments == 0:
                     continue
+            count += 1
             input_str = "{:11.8f}".format(
                 channel.input_capacity / SATS_PER_BTC) if channel.input_capacity else " -         "
             output_str = "{:11.8f}".format(
@@ -370,6 +375,10 @@ parser.add_option("-v", "--verbosity",
                   action="store", type="int", dest="verbosity", default=0,
                   help="Verbosity level: 0 to 5")
 
+parser.add_option("-l", "--limit",
+                  action="store", type="int", dest="limit", default=0,
+                  help="Limit number of channels logged to provided parameter")
+
 parser.add_option("", "--force",
                   action="store_true", dest="force", default=False,
                   help="Do not skip 0 fees settings")
@@ -411,7 +420,8 @@ elif options.command == "setfees":
     my_node.set_fees(options.force, int(fees[0]), int(fees[1]), int(fees[2]), int(fees[3]))
 elif options.command == "status":
     my_node.print_status(verbosity=options.verbosity,
-                         sort_key=options.sort_key)
+                         sort_key=options.sort_key,
+                         limit=options.limit)
 
 """
 print(clapi.getinfo())
