@@ -16,13 +16,13 @@ LCW_DATA_PATH = os.getenv("HOME") + "/.lcwdata.json"
 
 
 # Verbosity
-#    chan      peer id
-# 0  wp only   short
-# 1  all       short
-# 2  all       short
-# 3  all       short
-# 4  all       short
-# 5  all       long
+#     chan      peer id
+# 0   wp only   very short
+# 1 * wp only   short
+# 2   all       short
+# 3   all       short
+# 4   all       short
+# 5   all       long
 
 
 def file_content(path):
@@ -318,11 +318,14 @@ class Node:
             if limit > 0:
                 if count >= limit:
                     break
-            if verbosity == 0:
-                if channel.state != "CHANNELD_NORMAL":
-                    pass
-                elif channel.total_payments == 0:
-                    continue
+            show = True
+            if verbosity <= 1:
+                if channel.total_payments == 0:
+                    show = False
+            if channel.state != "CHANNELD_NORMAL":
+                show = True
+            if show is False:
+                continue
             count += 1
             input_str = "{:11.8f}".format(
                 channel.input_capacity / SATS_PER_BTC) if channel.input_capacity else " -         "
@@ -393,7 +396,7 @@ parser.add_option("-t", "--test",
                   help="Test mode")
 
 parser.add_option("-v", "--verbosity",
-                  action="store", type="int", dest="verbosity", default=0,
+                  action="store", type="int", dest="verbosity", default=1,
                   help="Verbosity level: 0 to 5")
 
 parser.add_option("-l", "--limit",
