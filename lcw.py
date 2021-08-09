@@ -15,6 +15,16 @@ NOW = int(time.time())
 LCW_DATA_PATH = os.getenv("HOME") + "/.lcwdata.json"
 
 
+# Verbosity
+#    chan      peer id
+# 0  wp only   short
+# 1  all       short
+# 2  all       short
+# 3  all       short
+# 4  all       short
+# 5  all       long
+
+
 def file_content(path):
     try:
         file = open(path, mode="r")
@@ -54,8 +64,8 @@ def age_string2(age_seconds):
         return "{:2d} months".format((days+15) // 30)
 
 
-def peer_id_string(peer_id, verbose=False):
-    if verbose:
+def peer_id_string(peer_id, verbosity):
+    if verbosity == 5:
         return peer_id
     else:
         return "{}...{}".format(
@@ -268,7 +278,7 @@ class Node:
                                                                        DEFAULT_BASE_FEE,
                                                                        new_ppm_fee))
 
-    def print_status(self, verbose=False, sort_key=None):
+    def print_status(self, verbosity=0, sort_key=None):
         print("Wallet funds (BTC):")
         print("- Confirmed:   {:11.8f}".format(self.wallet_value_confirmed / SATS_PER_BTC))
         print("- Unconfirmed: {:11.8f}".format(self.wallet_value_unconfirmed / SATS_PER_BTC))
@@ -283,6 +293,8 @@ class Node:
                 reverse = False
             items.sort(key=lambda item: item[1][sort_key], reverse=reverse)
         for (channel_id, channel) in items:
+            if channel.total_payments == 0 and verbosity == 0:
+                continue
             input_str = "{:11.8f}".format(
                 channel.input_capacity / SATS_PER_BTC) if channel.input_capacity else " -         "
             output_str = "{:11.8f}".format(
@@ -295,7 +307,7 @@ class Node:
             )
             print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {:5.1f}  {:8.1f}  {} ({}/{})".format(
                 channel_id,
-                peer_id_string(channel.peer_id, verbose),
+                peer_id_string(channel.peer_id, verbosity),
                 input_str,
                 output_str,
                 channel.total_capacity / SATS_PER_BTC,
@@ -351,9 +363,9 @@ parser.add_option("-t", "--test",
                   action="store_true", dest="test_mode", default=False,
                   help="Test mode")
 
-parser.add_option("-v", "--verbose",
-                  action="store_true", dest="verbose", default=False,
-                  help="Verbose")
+parser.add_option("-v", "--verbosity",
+                  action="store", type="int", dest="verbosity", default=0,
+                  help="Verbosity level: 0 to 5")
 
 parser.add_option("", "--force",
                   action="store_true", dest="force", default=False,
@@ -395,7 +407,7 @@ elif options.command == "setfees":
     fees = options.fees.split("/")
     my_node.set_fees(options.force, int(fees[0]), int(fees[1]), int(fees[2]), int(fees[3]))
 elif options.command == "status":
-    my_node.print_status(verbose=options.verbose,
+    my_node.print_status(verbosity=options.verbosity,
                          sort_key=options.sort_key)
 
 """
