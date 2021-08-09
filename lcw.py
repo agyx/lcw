@@ -67,8 +67,13 @@ def age_string2(age_seconds):
 def peer_id_string(alias, peer_id, verbosity):
     if verbosity == 5:
         return "{:24.24} {}".format(alias, peer_id)
+    elif verbosity == 0:
+        return "{:12.12} {}...".format(
+            alias,
+            peer_id[:4],
+        )
     else:
-        return "{:12.12} {}...{}".format(
+        return "{:16.16} {}...{}".format(
             alias,
             peer_id[:8],
             peer_id[-8:],
