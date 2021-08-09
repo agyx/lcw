@@ -68,7 +68,7 @@ def peer_id_string(alias, peer_id, verbosity):
     if verbosity == 5:
         return "{:24.24} {}".format(alias, peer_id)
     else:
-        return "{:8.8} {}...{}".format(
+        return "{:12.12} {}...{}".format(
             alias,
             peer_id[:8],
             peer_id[-8:],
