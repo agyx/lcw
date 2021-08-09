@@ -64,11 +64,12 @@ def age_string2(age_seconds):
         return "{:2d} months".format((days+15) // 30)
 
 
-def peer_id_string(peer_id, verbosity):
+def peer_id_string(alias, peer_id, verbosity):
     if verbosity == 5:
-        return peer_id
+        return "{:24.24} {}".format(alias, peer_id)
     else:
-        return "{}...{}".format(
+        return "{:8.8} {}...{}".format(
+            alias,
             peer_id[:8],
             peer_id[-8:],
         )
@@ -110,6 +111,12 @@ class CLightning:
             return file_content("tests/listpeers.txt")
         else:
             return cli_query(["listpeers"])
+
+    def listnodes(self):
+        if self.test_mode:
+            return file_content("tests/listnodes.txt")
+        else:
+            return cli_query(["listnodes"])
 
     def setchannelfee(self, id, base, ppm):
         if self.test_mode:
@@ -183,7 +190,8 @@ class Node:
                                   new_channel=new_channel,
                                   total_payments=0,
                                   base_fee_msat=0,
-                                  ppm_fee=0)
+                                  ppm_fee=0,
+                                  alias="?")
             self.channels[short_channel_id] = channel
             self.input_capacity += input
             self.output_capacity += output
@@ -226,7 +234,6 @@ class Node:
                 self.in_payments += channel.in_payments
                 self.out_payments += channel.out_payments
                 self.routed_amount += channel.in_msatoshi_fulfilled
-
         for (channel_id, channel) in self.channels.items():
             channel_ref = self.get_channel_ref(channel_id)
             if channel.new_channel:
@@ -246,6 +253,15 @@ class Node:
                 channel.used_capacity = 1000
             else:
                 channel.used_capacity = channel.tx_per_day / channel.output_capacity * SATS_PER_BTC
+        # add aliases
+        self.listnodes = clapi.listnodes()["nodes"]
+        self.hashed_listnodes = {}
+        for node in self.listnodes:
+            if "alias" in node:
+                self.hashed_listnodes[node["nodeid"]] = node["alias"]
+        for (channel_id, channel) in self.channels.items():
+            if channel.peer_id in self.hashed_listnodes:
+                channel.alias = self.hashed_listnodes[channel.peer_id]
 
     def get_channel_ref(self, channel_id):
         if self.data_stored is not None and channel_id in self.data_stored:
@@ -315,7 +331,7 @@ class Node:
             )
             print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {:5.1f}  {:8.1f}  {} ({}/{})".format(
                 channel_id,
-                peer_id_string(channel.peer_id, verbosity),
+                peer_id_string(channel.alias, channel.peer_id, verbosity),
                 input_str,
                 output_str,
                 channel.total_capacity / SATS_PER_BTC,
