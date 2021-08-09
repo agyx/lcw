@@ -241,7 +241,7 @@ class Node:
                 channel.total_payments = channel.in_payments + channel.out_payments
                 self.in_payments += channel.in_payments
                 self.out_payments += channel.out_payments
-                self.routed_amount += channel.in_msatoshi_fulfilled
+                self.routed_amount += (channel.in_msatoshi_fulfilled + channel.out_msatoshi_fulfilled) / 2 / 1000
         for (channel_id, channel) in self.channels.items():
             channel_ref = self.get_channel_ref(channel_id)
             if channel.new_channel:
@@ -362,7 +362,9 @@ class Node:
             self.input_capacity / SATS_PER_BTC,
             self.output_capacity / SATS_PER_BTC))
         print("- Routed payments : {}".format(self.in_payments))
-        print("- Routed amount   : {:.8f} BTC".format(self.routed_amount / 1000 / SATS_PER_BTC))
+        print("- Routed amount   : {:.8f} BTC".format(self.routed_amount / SATS_PER_BTC))
+        routed_capacity = self.routed_amount / self.total * 2
+        print("- Routed capacity : {:.2f}".format(routed_capacity))
         tvl = self.output_capacity + self.total_wallet
         print("- Node Value      : {:.8f} BTC".format(tvl / SATS_PER_BTC))
         print("- Fees collected  : {:.0f} sats".format(self.fees_collected))
