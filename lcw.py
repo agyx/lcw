@@ -293,8 +293,11 @@ class Node:
                 reverse = False
             items.sort(key=lambda item: item[1][sort_key], reverse=reverse)
         for (channel_id, channel) in items:
-            if channel.total_payments == 0 and verbosity == 0:
-                continue
+            if verbosity == 0:
+                if channel.state != "CHANNELD_NORMAL":
+                    pass
+                elif channel.total_payments == 0:
+                    continue
             input_str = "{:11.8f}".format(
                 channel.input_capacity / SATS_PER_BTC) if channel.input_capacity else " -         "
             output_str = "{:11.8f}".format(
