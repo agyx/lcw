@@ -352,7 +352,7 @@ class Node:
                     show = False
             if channel.state != "CHANNELD_NORMAL":
                 show = True
-            if channel.age < 1:
+            if channel.age < 86400:
                 show = True
             if show is False:
                 continue
