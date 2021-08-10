@@ -16,13 +16,14 @@ LCW_DATA_PATH = os.getenv("HOME") + "/.lcwdata.json"
 
 
 # Verbosity
-#     chan      peer id
-# 0   wp only   very short
-# 1 * wp only   short
-# 2   all       short
-# 3   all       short
-# 4   all       short
-# 5   all       long
+#     list      peer id      capacity
+# -----------------------------------------
+# 0   wp only   very short   bars
+# 1 * wp only   short        bars
+# 2   all       short        bars
+# 3   all       short        values
+# 4   all       short        values
+# 5   all       long         values
 
 
 def file_content(path):
@@ -77,6 +78,29 @@ def peer_id_string(alias, peer_id, verbosity):
             alias,
             peer_id[:8],
             peer_id[-8:],
+        )
+
+
+def capacity_string(input, output, verbosity):
+    BAR_CHAR = "="
+    total = input + output
+    if verbosity <= 2:
+        input_bars = round(input / total * 10)
+        output_bars = round(output / total * 10)
+        return "{:>10.10}|{:<10.10} {:11.8f}".format(
+            BAR_CHAR * input_bars,
+            BAR_CHAR * output_bars,
+            total / SATS_PER_BTC
+        )
+    else:
+        input_str = "{:10.8f}".format(
+            input / SATS_PER_BTC) if input else "          "
+        output_str = "{:10.8f}".format(
+            output / SATS_PER_BTC) if output else "          "
+        return "{}-{}  {:10.8f}".format(
+            input_str,
+            output_str,
+            total / SATS_PER_BTC
         )
 
 
@@ -197,7 +221,8 @@ class Node:
                                   base_fee_msat=0,
                                   ppm_fee=0,
                                   alias="?",
-                                  routed_amount=0)
+                                  routed_amount=0,
+                                  routed_capacity=0)
             self.channels[short_channel_id] = channel
             self.input_capacity += input
             self.output_capacity += output
@@ -330,22 +355,16 @@ class Node:
             if show is False:
                 continue
             count += 1
-            input_str = "{:11.8f}".format(
-                channel.input_capacity / SATS_PER_BTC) if channel.input_capacity else " -         "
-            output_str = "{:11.8f}".format(
-                channel.output_capacity / SATS_PER_BTC) if channel.output_capacity else " -         "
             payments_str = "{:8s} {:4d}".format(
                 "{:4d}-{:<d}".format(
                     channel.in_payments,
                     channel.out_payments),
                 channel.total_payments,
             )
-            print("- {:13s}  {} {}-{}  {:11.8f}  {}  {}  {:5.1f}  {:6.2f}  {} ({}/{})".format(
+            print("- {:13s}  {}  {}  {}  {}  {:5.1f}  {:6.2f}  {} ({}/{})".format(
                 channel_id,
                 peer_id_string(channel.alias, channel.peer_id, verbosity),
-                input_str,
-                output_str,
-                channel.total_capacity / SATS_PER_BTC,
+                capacity_string(channel.input_capacity, channel.output_capacity, verbosity),
                 payments_str,
                 age_string2(channel.age),
                 channel.tx_per_day,
