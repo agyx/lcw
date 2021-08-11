@@ -314,26 +314,24 @@ class Node:
         else:
             return None
 
-    def set_fees(self, force, ppm0, ppm1, ppm2, ppm3):
+    def set_fees(self, force, k, offset, max):
         DEFAULT_BASE_FEE = 0
         for (channel_id, channel) in self.channels.items():
-            out_percent = channel.output_capacity / (channel.input_capacity + channel.output_capacity) * 100
+            out_ratio = channel.output_capacity / (channel.input_capacity + channel.output_capacity)
             if channel.ppm_fee == 0 and not force:
                 print("{:13s} skipped".format(channel_id))
                 continue
-            elif out_percent <= 10:
-                new_ppm_fee = ppm3
-            elif out_percent <= 25:
-                new_ppm_fee = ppm2
-            elif out_percent <= 50:
-                new_ppm_fee = ppm1
+            elif out_ratio == 0:
+                new_ppm_fee = max
             else:
-                new_ppm_fee = ppm0
+                new_ppm_fee = int(k / out_ratio + offset)
+                if new_ppm_fee > max:
+                    new_ppm_fee = max
             if channel.base_fee_msat == DEFAULT_BASE_FEE and new_ppm_fee == channel.ppm_fee:
                 continue
             clapi.setchannelfee(channel_id, DEFAULT_BASE_FEE, new_ppm_fee)
             print("{:13s} {:4.0f}%  {:5d}/{:5d} -> {:5d}/{:5d}".format(channel_id,
-                                                                       out_percent,
+                                                                       out_ratio * 100,
                                                                        channel.base_fee_msat,
                                                                        channel.ppm_fee,
                                                                        DEFAULT_BASE_FEE,
@@ -454,9 +452,8 @@ parser.add_option("", "--since",
                   help="Payments and derived stats are counted from given # of days")
 
 parser.add_option("-f", "--fees",
-                  action="store", type="string", dest="fees", default="10/20/150/1000",
-                  help="Set fees from a string <ppm0>/<ppm1>/<ppm2>/<ppm3> respectively"
-                       "for quartiles 100%/50%/25%/10% of %out payments."
+                  action="store", type="string", dest="fees", default="50/-40/2000",
+                  help="Set ppm fees from a string <k>/<offset>/<max>"
                        "Base fee is always 0")
 
 parser.add_option("", "--command",
@@ -479,7 +476,7 @@ if options.command == "store":
     my_node.store()
 elif options.command == "setfees":
     fees = options.fees.split("/")
-    my_node.set_fees(options.force, int(fees[0]), int(fees[1]), int(fees[2]), int(fees[3]))
+    my_node.set_fees(options.force, int(fees[0]), int(fees[1]), int(fees[2]))
 elif options.command == "status":
     my_node.print_status(verbosity=options.verbosity,
                          sort_key=options.sort_key,
