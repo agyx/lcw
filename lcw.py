@@ -228,6 +228,8 @@ class Node:
                                   out_payments=0,
                                   in_msatoshi_fulfilled=0,
                                   out_msatoshi_fulfilled=0,
+                                  in_msatoshi_offered=0,
+                                  out_msatoshi_offered=0,
                                   new_channel=new_channel,
                                   total_payments=0,
                                   base_fee_msat=0,
@@ -258,10 +260,14 @@ class Node:
                     print("unknown channel {} in listpeers".format(channel_id))
                     continue
                 channel = self.channels[channel_id]
+                channel.in_payments_offered = channel_data["in_payments_offered"]
+                channel.out_payments_offered = channel_data["out_payments_offered"]
                 channel.in_payments = channel_data["in_payments_fulfilled"]
                 channel.out_payments = channel_data["out_payments_fulfilled"]
                 channel.in_msatoshi_fulfilled = channel_data["in_msatoshi_fulfilled"]
                 channel.out_msatoshi_fulfilled = channel_data["out_msatoshi_fulfilled"]
+                channel.in_msatoshi_offered = channel_data["in_msatoshi_offered"]
+                channel.out_msatoshi_offered = channel_data["out_msatoshi_offered"]
                 channel_ref = self.get_channel_ref(channel_id)
                 if channel_ref is not None:
                     # print(data_stored)
@@ -269,10 +275,14 @@ class Node:
                     #                           channel.out_payments,
                     #                           channel_ref["in_payments"],
                     #                           channel_ref["out_payments"]))
+                    channel.in_payments_offered -= channel_ref["in_payments_offered"]
+                    channel.out_payments_offered -= channel_ref["out_payments_offered"]
                     channel.in_payments -= channel_ref["in_payments"]
                     channel.out_payments -= channel_ref["out_payments"]
                     channel.in_msatoshi_fulfilled -= channel_ref["in_msatoshi_fulfilled"]
                     channel.out_msatoshi_fulfilled -= channel_ref["out_msatoshi_fulfilled"]
+                    channel.in_msatoshi_offered -= channel_ref["in_msatoshi_offered"]
+                    channel.out_msatoshi_offered -= channel_ref["out_msatoshi_offered"]
                 channel.routed_amount = (channel.in_msatoshi_fulfilled + channel.out_msatoshi_fulfilled) / 1000
                 channel.routed_capacity = channel.routed_amount / channel.total_capacity
                 channel.total_payments = channel.in_payments + channel.out_payments
