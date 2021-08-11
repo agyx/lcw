@@ -277,14 +277,15 @@ class Node:
                     #                           channel.out_payments,
                     #                           channel_ref["in_payments"],
                     #                           channel_ref["out_payments"]))
-                    channel.in_payments_offered -= channel_ref["in_payments_offered"]
-                    channel.out_payments_offered -= channel_ref["out_payments_offered"]
                     channel.in_payments -= channel_ref["in_payments"]
                     channel.out_payments -= channel_ref["out_payments"]
                     channel.in_msatoshi_fulfilled -= channel_ref["in_msatoshi_fulfilled"]
                     channel.out_msatoshi_fulfilled -= channel_ref["out_msatoshi_fulfilled"]
-                    channel.in_msatoshi_offered -= channel_ref["in_msatoshi_offered"]
-                    channel.out_msatoshi_offered -= channel_ref["out_msatoshi_offered"]
+                    if "in_msatoshi_offered" in channel_ref:
+                        channel.in_payments_offered -= channel_ref["in_payments_offered"]
+                        channel.out_payments_offered -= channel_ref["out_payments_offered"]
+                        channel.in_msatoshi_offered -= channel_ref["in_msatoshi_offered"]
+                        channel.out_msatoshi_offered -= channel_ref["out_msatoshi_offered"]
                 channel.routed_amount = (channel.in_msatoshi_fulfilled + channel.out_msatoshi_fulfilled) / 1000
                 channel.routed_capacity = channel.routed_amount / channel.total_capacity
                 channel.total_payments = channel.in_payments + channel.out_payments
