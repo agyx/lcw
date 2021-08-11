@@ -314,7 +314,7 @@ class Node:
         else:
             return None
 
-    def set_fees(self, force, k, offset, max):
+    def set_fees(self, force, k, offset, max_ppm):
         DEFAULT_BASE_FEE = 0
         for (channel_id, channel) in self.channels.items():
             out_ratio = channel.output_capacity / (channel.input_capacity + channel.output_capacity)
@@ -322,11 +322,11 @@ class Node:
                 print("{:13s} skipped".format(channel_id))
                 continue
             elif out_ratio == 0:
-                new_ppm_fee = max
+                new_ppm_fee = max_ppm
             else:
-                new_ppm_fee = int(k / out_ratio + offset)
-                if new_ppm_fee > max:
-                    new_ppm_fee = max
+                new_ppm_fee = int(round(k / out_ratio + offset, -1))
+                if new_ppm_fee > max_ppm:
+                    new_ppm_fee = max_ppm
             if channel.base_fee_msat == DEFAULT_BASE_FEE and new_ppm_fee == channel.ppm_fee:
                 continue
             clapi.setchannelfee(channel_id, DEFAULT_BASE_FEE, new_ppm_fee)
