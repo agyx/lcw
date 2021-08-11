@@ -224,6 +224,8 @@ class Node:
                                   total_capacity=input + output,
                                   state=channel_data["state"],
                                   last_update=NOW,
+                                  in_payments_offered=0,
+                                  out_payments_offered=0,
                                   in_payments=0,
                                   out_payments=0,
                                   in_msatoshi_fulfilled=0,
