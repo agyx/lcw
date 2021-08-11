@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import string
 import sys
 import subprocess
 import os
@@ -66,16 +67,17 @@ def age_string2(age_seconds):
 
 
 def peer_id_string(alias, peer_id, verbosity):
+    filtered_alias = filter_alias(alias)
     if verbosity == 5:
-        return "{:24.24} {}".format(alias, peer_id)
+        return "{:24.24} {}".format(filtered_alias, peer_id)
     elif verbosity == 0:
         return "{:12.12} {}...".format(
-            alias,
+            filtered_alias,
             peer_id[:4],
         )
     else:
         return "{:16.16} {}...{}".format(
-            alias,
+            filtered_alias,
             peer_id[:8],
             peer_id[-8:],
         )
@@ -110,6 +112,16 @@ def day(days_ago=0):
 
 def timestamp_from_day(day):
     return int(time.mktime(time.strptime(day + " 00:00:00", '%Y%m%d %H:%M:%S')))
+
+
+def filter_alias(alias):
+    result = ""
+    for ch in alias:
+        if ch in string.printable:
+            result += ch
+        else:
+            result += "!"
+    return result
 
 
 class CLightning:
