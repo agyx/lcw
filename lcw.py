@@ -53,11 +53,11 @@ def age_string(timestamp):
     return age_string2(NOW - timestamp)
 
 
-def age_string2(age_seconds):
-    age = age_seconds
-    if age < DAY:
+def age_string2(age_days):
+    age = age_days
+    if age < 1:
         return "   today "
-    days = age // DAY
+    days = int(age)
     if days == 1:
         return " 1 day   "
     elif days < 90:
@@ -178,7 +178,7 @@ class Node:
                 self.date_ref = day(since)
                 if self.date_ref in data_stored:
                     self.data_stored = data_stored[self.date_ref]
-                    self.period = NOW - timestamp_from_day(self.date_ref)
+                    self.period = (NOW - timestamp_from_day(self.date_ref)) / 86400
                     self.since = since
         self.getinfo = clapi.getinfo()
         self.id = self.getinfo["id"]
@@ -298,7 +298,7 @@ class Node:
                 channel.funding_block = self.block_height
             else:
                 channel.funding_block = int(channel_id.split("x")[0])
-            channel.age = (self.block_height - channel.funding_block) * 600
+            channel.age = (self.block_height - channel.funding_block) * 600 / 86400
             if channel_ref is not None:
                 period = self.period
             else:
@@ -306,7 +306,7 @@ class Node:
             if period <= 0:
                 channel.tx_per_day = 0
             else:
-                channel.tx_per_day = channel.total_payments / (period / 86400)
+                channel.tx_per_day = channel.total_payments / period
             #if channel.output_capacity == 0:
             #    channel.used_capacity = 1000
             #else:
@@ -375,7 +375,7 @@ class Node:
                     show = False
             if channel.state != "CHANNELD_NORMAL":
                 show = True
-            if channel.age < 86400:
+            if channel.age < 1:
                 show = True
             if show is False:
                 continue
