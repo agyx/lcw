@@ -477,6 +477,10 @@ parser.add_option("", "--bestpeer",
                   action="store_true", dest="bestpeer", default=False,
                   help="Search for best connectivity peer")
 
+parser.add_option("", "--node",
+                  action="store", type="string", dest="node", default=None,
+                  help="Analyze node")
+
 parser.add_option("", "--command",
                   action="store", type="string", dest="command", default="status",
                   help="store: Store current channels information into json history file"
@@ -575,8 +579,17 @@ elif options.command == "analyze":
         print("- centrality score: {:.3f}".format(score))
         return score
 
-
-    if options.bestpeer:
+    if options.node is not None:
+        if options.node == "self":
+            node_id = my_node.id
+        else:
+            node_id = options.node
+        print("Node {} {}".format(my_node.hashed_listnodes[node_id], node_id))
+        hops = centrality_map(node_id)
+        print("- hops: {}".format(hops))
+        score = centrality_score(hops)
+        print("- centrality score: {:.3f}".format(score))
+    elif options.bestpeer:
         print("Searching for best connectivity peer")
         current_score = analyze(my_node.id)
         score_board = []
