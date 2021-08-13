@@ -34,6 +34,7 @@ def file_content(path):
         file.close()
         return json.loads(content)
     except Exception:
+        print("file not found: " + path)
         return None
 
 
@@ -63,7 +64,7 @@ def age_string2(age_days):
     elif days < 90:
         return "{:2d} days  ".format(days)
     else:
-        return "{:2d} months".format((days+15) // 30)
+        return "{:2d} months".format((days + 15) // 30)
 
 
 def peer_id_string(alias, peer_id, verbosity):
@@ -141,9 +142,12 @@ class CLightning:
         else:
             return cli_query(['listfunds'])
 
-    def listchannels(self, short_channel_id, source_node_id):
+    def listchannels(self, short_channel_id="null", source_node_id="null"):
         if self.test_mode:
-            return file_content("tests/listchannels.txt")
+            if source_node_id == "null":
+                return file_content("tests/listchannels-all.txt")
+            else:
+                return file_content("tests/listchannels.txt")
         else:
             return cli_query(['listchannels', short_channel_id, source_node_id])
 
@@ -184,7 +188,7 @@ class Node:
         self.id = self.getinfo["id"]
         self.fees_collected = self.getinfo["msatoshi_fees_collected"] / 1000
         self.listfunds = clapi.listfunds()
-        self.listchannels = clapi.listchannels("null", self.id)
+        self.listchannels = clapi.listchannels(source_node_id=self.id)
         self.listpeers = clapi.listpeers()
         self.channels = {}
         self.all_last_updates = []
@@ -307,9 +311,9 @@ class Node:
                 channel.tx_per_day = 0
             else:
                 channel.tx_per_day = channel.total_payments / period
-            #if channel.output_capacity == 0:
+            # if channel.output_capacity == 0:
             #    channel.used_capacity = 1000
-            #else:
+            # else:
             #    channel.used_capacity = channel.tx_per_day / channel.output_capacity * SATS_PER_BTC
         # add aliases
         self.listnodes = clapi.listnodes()["nodes"]
@@ -469,11 +473,16 @@ parser.add_option("-f", "--fees",
                   help="Set ppm fees from a string <k>/<offset>/<max>"
                        "Base fee is always 0")
 
+parser.add_option("", "--bestpeer",
+                  action="store_true", dest="bestpeer", default=False,
+                  help="Search for best connectivity peer")
+
 parser.add_option("", "--command",
                   action="store", type="string", dest="command", default="status",
                   help="store: Store current channels information into json history file"
                        "status:"
                        "setfees:"
+                       "analyze:"
                   )
 
 (options, args) = parser.parse_args()
@@ -494,6 +503,101 @@ elif options.command == "status":
     my_node.print_status(verbosity=options.verbosity,
                          sort_key=options.sort_key,
                          limit=options.limit)
+elif options.command == "analyze":
+    print("getting all channels...")
+    channels = clapi.listchannels()
+    print("building the network...")
+    nodes = {}
+    for channel in channels["channels"]:
+        source = channel["source"]
+        if source in nodes:
+            node = nodes[source]
+        else:
+            node = munch.Munch(
+                node_id=source,
+                channels=[]
+            )
+            nodes[source] = node
+        node.channels += [munch.Munch.fromDict(channel)]
+
+
+    def centrality_map(node_id, new_peer=None):
+        start_node = nodes[node_id]
+        if new_peer is not None:
+            start_node.channels += [munch.Munch(source=node_id,
+                                                destination=new_peer,
+                                                public=True)]
+        visited = {}
+        newly_visited = {}
+        visited[start_node.node_id] = start_node
+        newly_visited[start_node.node_id] = start_node
+        hops = []
+        for depth in range(1, 10):
+            next_newly_visited = {}
+            for neighbour in newly_visited.values():
+                for channel in neighbour.channels:
+                    if not channel.public:
+                        continue
+                    if channel.destination not in nodes:
+                        pass
+                        # print("node not found: " + channel.destination)
+                    else:
+                        new_node = nodes[channel.destination]
+                        if new_node.node_id not in visited and new_node.node_id not in newly_visited:
+                            next_newly_visited[new_node.node_id] = new_node
+            # print("{} hops: {} nodes".format(depth, len(next_newly_visited)))
+            visited.update(newly_visited)
+            newly_visited = next_newly_visited
+            if len(newly_visited) == 0:
+                break
+            hops += [len(newly_visited)]
+        if new_peer is not None:
+            start_node.channels.pop()
+        return hops
+
+
+    def centrality_score(hops):
+        # hops = centrality_map(node_id)
+        depth = 1
+        wsum = 0
+        for hop in hops:
+            wsum += hop * depth
+            depth += 1
+        wsum /= len(nodes)
+        return wsum
+
+
+    def analyze(node_id, new_peer=None):
+        print("Node {} {}".format(my_node.hashed_listnodes[node_id], node_id))
+        hops = centrality_map(node_id, new_peer=new_peer)
+        print("- hops: {}".format(hops))
+        score = centrality_score(hops)
+        print("- centrality score: {:.3f}".format(score))
+        return score
+
+
+    if options.bestpeer:
+        print("Searching for best connectivity peer")
+        current_score = analyze(my_node.id)
+        score_board = []
+        for node in nodes.values():
+            if len(node.channels) < 25:
+                continue
+            print()
+            hops = centrality_map(my_node.id, new_peer=node.node_id)
+            new_score = centrality_score(hops)
+            score_board += [(node, new_score)]
+            score_board.sort(key=lambda x: x[1])
+            count = 0
+            print()
+            for score in score_board:
+                print("{:24.24} {}: {:.3f} ({:+.3f})".format(filter_alias(my_node.hashed_listnodes[score[0].node_id]),
+                                                             score[0].node_id,
+                                                             score[1],
+                                                             score[1] - current_score))
+                count += 1
+                if count == 15:
+                    break
 
 """
 print(clapi.getinfo())
