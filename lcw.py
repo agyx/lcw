@@ -477,6 +477,10 @@ parser.add_option("", "--bestpeer",
                   action="store_true", dest="bestpeer", default=False,
                   help="Search for best connectivity peer")
 
+parser.add_option("", "--bestnodes",
+                  action="store_true", dest="bestnodes", default=False,
+                  help="Search for best connected nodes")
+
 parser.add_option("", "--node",
                   action="store", type="string", dest="node", default=None,
                   help="Analyze node")
@@ -609,6 +613,26 @@ elif options.command == "analyze":
                                                        score[0].node_id,
                                                        score[1],
                                                        score[1] - current_score))
+                count += 1
+                if count == 15:
+                    break
+    elif options.bestnodes:
+        print("Searching for best connected nodes")
+        score_board = []
+        for node in nodes.values():
+            if len(node.channels) < 25:
+                continue
+            print()
+            hops = centrality_map(node.node_id)
+            new_score = centrality_score(hops)
+            score_board += [(node, new_score)]
+            score_board.sort(key=lambda x: x[1], reverse=True)
+            count = 0
+            print()
+            for score in score_board:
+                print("{:24.24} {}: {}".format(filter_alias(my_node.hashed_listnodes[score[0].node_id]),
+                                               score[0].node_id,
+                                               score[1]))
                 count += 1
                 if count == 15:
                     break
