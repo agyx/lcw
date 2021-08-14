@@ -540,8 +540,8 @@ elif options.command == "analyze":
             next_newly_visited = {}
             for neighbour in newly_visited.values():
                 for channel in neighbour.channels:
-                    if not channel.public:
-                        continue
+                    # if not channel.public:
+                    #     continue
                     if channel.destination not in nodes:
                         pass
                         # print("node not found: " + channel.destination)
@@ -565,10 +565,10 @@ elif options.command == "analyze":
         depth = 1
         wsum = 0
         for hop in hops:
-            wsum += hop * depth
+            wsum += hop * (1 / depth)
             depth += 1
         wsum /= len(nodes)
-        return wsum
+        return round(wsum * 1000)
 
 
     def analyze(node_id, new_peer=None):
@@ -576,8 +576,9 @@ elif options.command == "analyze":
         hops = centrality_map(node_id, new_peer=new_peer)
         print("- hops: {}".format(hops))
         score = centrality_score(hops)
-        print("- centrality score: {:.3f}".format(score))
+        print("- centrality score: {}".format(score))
         return score
+
 
     if options.node is not None:
         if options.node == "self":
@@ -588,7 +589,7 @@ elif options.command == "analyze":
         hops = centrality_map(node_id)
         print("- hops: {}".format(hops))
         score = centrality_score(hops)
-        print("- centrality score: {:.3f}".format(score))
+        print("- centrality score: {}".format(score))
     elif options.bestpeer:
         print("Searching for best connectivity peer")
         current_score = analyze(my_node.id)
@@ -600,14 +601,14 @@ elif options.command == "analyze":
             hops = centrality_map(my_node.id, new_peer=node.node_id)
             new_score = centrality_score(hops)
             score_board += [(node, new_score)]
-            score_board.sort(key=lambda x: x[1])
+            score_board.sort(key=lambda x: x[1], reverse=True)
             count = 0
             print()
             for score in score_board:
-                print("{:24.24} {}: {:.3f} ({:+.3f})".format(filter_alias(my_node.hashed_listnodes[score[0].node_id]),
-                                                             score[0].node_id,
-                                                             score[1],
-                                                             score[1] - current_score))
+                print("{:24.24} {}: {} ({:+d})".format(filter_alias(my_node.hashed_listnodes[score[0].node_id]),
+                                                       score[0].node_id,
+                                                       score[1],
+                                                       score[1] - current_score))
                 count += 1
                 if count == 15:
                     break
