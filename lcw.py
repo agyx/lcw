@@ -596,6 +596,10 @@ elif options.command == "analyze":
         print("- centrality score: {}".format(score))
     elif options.bestpeer:
         print("Searching for best connectivity peer")
+        if options.limit is not None:
+            limit = options.limit
+        else:
+            limit = 15
         current_score = analyze(my_node.id)
         score_board = []
         for node in nodes.values():
@@ -614,10 +618,14 @@ elif options.command == "analyze":
                                                        score[1],
                                                        score[1] - current_score))
                 count += 1
-                if count == 15:
+                if count == limit:
                     break
     elif options.bestnodes:
         print("Searching for best connected nodes")
+        if options.limit is not None:
+            limit = options.limit
+        else:
+            limit = 15
         score_board = []
         for node in nodes.values():
             if len(node.channels) < 25:
@@ -634,7 +642,7 @@ elif options.command == "analyze":
                                                score[0].node_id,
                                                score[1]))
                 count += 1
-                if count == 15:
+                if count == limit:
                     break
 
 """
