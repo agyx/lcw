@@ -659,16 +659,24 @@ elif options.command == "analyze":
         hops = centrality_map(my_node.id)
         node_score = centrality_score(hops)
         print("Node current score: {}".format(node_score))
+        no_contrib_aliases = []
         for channel in channels:
             channel_hops = centrality_map(channel.destination)
             channel_score = centrality_score(channel_hops)
             node_hops = centrality_map(my_node.id, without_index=index)
             contrib_score = centrality_score(node_hops)
-            print("{:24.24} {}: {} {:+d}".format(filter_alias(my_node.hashed_listnodes[channel.destination]),
-                                                 channel.destination,
-                                                 channel_score,
-                                                 contrib_score - node_score))
+            contrib = node_score - contrib_score
+            alias = filter_alias(my_node.hashed_listnodes[channel.destination])
+            if contrib > 0:
+                print("{:24.24} {}: {} {:+d}".format(alias,
+                                                     channel.destination,
+                                                     channel_score,
+                                                     contrib))
+            else:
+                no_contrib_aliases += alias
             index += 1
+        print("No connectivity contribution: " + ", ".join(no_contrib_aliases))
+
 
 """
 print(clapi.getinfo())
