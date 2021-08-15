@@ -673,7 +673,7 @@ elif options.command == "analyze":
                                                      channel_score,
                                                      contrib))
             else:
-                no_contrib_aliases += alias
+                no_contrib_aliases += [alias]
             index += 1
         print("No connectivity contribution: " + ", ".join(no_contrib_aliases))
 
