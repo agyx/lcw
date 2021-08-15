@@ -477,6 +477,10 @@ parser.add_option("", "--bestpeer",
                   action="store_true", dest="bestpeer", default=False,
                   help="Search for best connectivity peer")
 
+parser.add_option("", "--channels",
+                  action="store_true", dest="channels", default=False,
+                  help="Analyze connectivity contribution of node's current channels")
+
 parser.add_option("", "--bestnodes",
                   action="store_true", dest="bestnodes", default=False,
                   help="Search for best connected nodes")
@@ -529,12 +533,15 @@ elif options.command == "analyze":
         node.channels += [munch.Munch.fromDict(channel)]
 
 
-    def centrality_map(node_id, new_peer=None):
+    def centrality_map(node_id, new_peer=None, without_index=None):
         start_node = nodes[node_id]
+        removed_channel = None
         if new_peer is not None:
             start_node.channels += [munch.Munch(source=node_id,
                                                 destination=new_peer,
                                                 public=True)]
+        elif without_index is not None:
+            removed_channel = start_node.channels.pop(without_index)
         visited = {}
         newly_visited = {}
         visited[start_node.node_id] = start_node
@@ -561,6 +568,8 @@ elif options.command == "analyze":
             hops += [len(newly_visited)]
         if new_peer is not None:
             start_node.channels.pop()
+        elif without_index is not None:
+            start_node.channels.insert(without_index, removed_channel)
         return hops
 
 
@@ -590,13 +599,13 @@ elif options.command == "analyze":
         else:
             node_id = options.node
         print("Node {} {}".format(my_node.hashed_listnodes[node_id], node_id))
-        hops = centrality_map(node_id)
-        print("- hops: {}".format(hops))
-        score = centrality_score(hops)
+        channel_hops = centrality_map(node_id)
+        print("- hops: {}".format(channel_hops))
+        score = centrality_score(channel_hops)
         print("- centrality score: {}".format(score))
     elif options.bestpeer:
         print("Searching for best connectivity peer")
-        if options.limit is not None:
+        if options.limit > 0:
             limit = options.limit
         else:
             limit = 15
@@ -606,8 +615,8 @@ elif options.command == "analyze":
             if len(node.channels) < 25:
                 continue
             print()
-            hops = centrality_map(my_node.id, new_peer=node.node_id)
-            new_score = centrality_score(hops)
+            channel_hops = centrality_map(my_node.id, new_peer=node.node_id)
+            new_score = centrality_score(channel_hops)
             score_board += [(node, new_score)]
             score_board.sort(key=lambda x: x[1], reverse=True)
             count = 0
@@ -622,7 +631,7 @@ elif options.command == "analyze":
                     break
     elif options.bestnodes:
         print("Searching for best connected nodes")
-        if options.limit is not None:
+        if options.limit > 0:
             limit = options.limit
         else:
             limit = 15
@@ -631,8 +640,8 @@ elif options.command == "analyze":
             if len(node.channels) < 25:
                 continue
             print()
-            hops = centrality_map(node.node_id)
-            new_score = centrality_score(hops)
+            channel_hops = centrality_map(node.node_id)
+            new_score = centrality_score(channel_hops)
             score_board += [(node, new_score)]
             score_board.sort(key=lambda x: x[1], reverse=True)
             count = 0
@@ -644,6 +653,22 @@ elif options.command == "analyze":
                 count += 1
                 if count == limit:
                     break
+    elif options.channels:
+        channels = nodes[my_node.id].channels
+        index = 0
+        hops = centrality_map(my_node.id)
+        node_score = centrality_score(hops)
+        print("Node current score: {}".format(node_score))
+        for channel in channels:
+            channel_hops = centrality_map(channel.destination)
+            channel_score = centrality_score(channel_hops)
+            node_hops = centrality_map(my_node.id, without_index=index)
+            contrib_score = centrality_score(node_hops)
+            print("{:24.24} {}: {} {:+d}".format(filter_alias(my_node.hashed_listnodes[channel.destination]),
+                                                 channel.destination,
+                                                 channel_score,
+                                                 contrib_score - node_score))
+            index += 1
 
 """
 print(clapi.getinfo())
