@@ -614,12 +614,9 @@ elif options.command == "analyze":
         for node in nodes.values():
             if len(node.channels) < 25:
                 continue
-            print()
             channel_hops = centrality_map(my_node.id, new_peer=node.node_id)
             new_score = centrality_score(channel_hops)
-            if new_score > current_score:
-                score_board += [(node, new_score)]
-            else:
+            if new_score <= current_score:
                 continue
             score_board.sort(key=lambda x: x[1], reverse=True)
             count = 0
@@ -632,6 +629,7 @@ elif options.command == "analyze":
                 count += 1
                 if count == limit:
                     break
+            print()
     elif options.bestnodes:
         print("Searching for best connected nodes")
         if options.limit > 0:
