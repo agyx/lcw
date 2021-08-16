@@ -618,6 +618,7 @@ elif options.command == "analyze":
             new_score = centrality_score(channel_hops)
             if new_score <= current_score:
                 continue
+            score_board += [(node, new_score)]
             score_board.sort(key=lambda x: x[1], reverse=True)
             count = 0
             print()
