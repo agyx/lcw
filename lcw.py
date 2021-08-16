@@ -473,9 +473,9 @@ parser.add_option("-f", "--fees",
                   help="Set ppm fees from a string <k>/<offset>/<max>"
                        "Base fee is always 0")
 
-parser.add_option("", "--bestpeer",
-                  action="store_true", dest="bestpeer", default=False,
-                  help="Search for best connectivity peer")
+parser.add_option("", "--bestpeers",
+                  action="store_true", dest="bestpeers", default=False,
+                  help="Search for best connectivity peers")
 
 parser.add_option("", "--channels",
                   action="store_true", dest="channels", default=False,
@@ -603,8 +603,8 @@ elif options.command == "analyze":
         print("- hops: {}".format(channel_hops))
         score = centrality_score(channel_hops)
         print("- centrality score: {}".format(score))
-    elif options.bestpeer:
-        print("Searching for best connectivity peer")
+    elif options.bestpeers:
+        print("Searching for best connectivity peers")
         if options.limit > 0:
             limit = options.limit
         else:
@@ -617,7 +617,8 @@ elif options.command == "analyze":
             print()
             channel_hops = centrality_map(my_node.id, new_peer=node.node_id)
             new_score = centrality_score(channel_hops)
-            score_board += [(node, new_score)]
+            if new_score > current_score:
+                score_board += [(node, new_score)]
             score_board.sort(key=lambda x: x[1], reverse=True)
             count = 0
             print()
