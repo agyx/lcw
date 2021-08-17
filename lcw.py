@@ -373,7 +373,7 @@ class Node:
                 if count >= limit:
                     break
             show = True
-            if verbosity <= 1:
+            if verbosity <= 2:
                 if channel.total_payments == 0:
                     show = False
             if channel.state != "CHANNELD_NORMAL":
