@@ -19,10 +19,9 @@ LCW_DATA_PATH = os.getenv("HOME") + "/.lcwdata.json"
 # Verbosity
 #     list      peer id      capacity
 # -----------------------------------------
-# 0   wp only   very short   bars
-# 1 * wp only   short        bars
-# 2   all       short        bars
-# 3   all       short        values
+# 1   wp only   very short   bars
+# 2 * wp only   short        bars
+# 3   all       short        bars
 # 4   all       short        values
 # 5   all       long         values
 
@@ -71,7 +70,7 @@ def peer_id_string(alias, peer_id, verbosity):
     filtered_alias = filter_alias(alias)
     if verbosity == 5:
         return "{:24.24} {}".format(filtered_alias, peer_id)
-    elif verbosity == 0:
+    elif verbosity == 1:
         return "{:12.12} {}...".format(
             filtered_alias,
             peer_id[:4],
@@ -87,7 +86,7 @@ def peer_id_string(alias, peer_id, verbosity):
 def capacity_string(input, output, verbosity):
     BAR_CHAR = "="
     total = input + output
-    if verbosity <= 2:
+    if verbosity <= 3:
         input_bars = round(input / total * 10)
         output_bars = round(output / total * 10)
         return "{:>10.10}|{:<10.10} {:11.8f}".format(
@@ -354,7 +353,7 @@ class Node:
                                                                        DEFAULT_BASE_FEE,
                                                                        new_ppm_fee))
 
-    def print_status(self, verbosity=0, sort_key=None, limit=0):
+    def print_status(self, verbosity=1, sort_key=None, limit=0):
         print("Wallet funds (BTC):")
         print("- Confirmed:   {:11.8f}".format(self.wallet_value_confirmed / SATS_PER_BTC))
         print("- Unconfirmed: {:11.8f}".format(self.wallet_value_unconfirmed / SATS_PER_BTC))
@@ -449,8 +448,8 @@ parser.add_option("-t", "--test",
                   help="Test mode")
 
 parser.add_option("-v", "--verbosity",
-                  action="store", type="int", dest="verbosity", default=1,
-                  help="Verbosity level: 0 to 5")
+                  action="store", type="int", dest="verbosity", default=2,
+                  help="Verbosity level: 1 to 5")
 
 parser.add_option("-l", "--limit",
                   action="store", type="int", dest="limit", default=0,
