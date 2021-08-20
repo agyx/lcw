@@ -467,6 +467,10 @@ parser.add_option("", "--since",
                   action="store", type="int", dest="since", default=None,
                   help="Payments and derived stats are counted from given # of days")
 
+parser.add_option("", "--amount",
+                  action="store", type="int", dest="amount", default=15000000,
+                  help="Amount for new channel when searching for best peers")
+
 parser.add_option("-f", "--fees",
                   action="store", type="string", dest="fees", default="50/-40/2000",
                   help="Set ppm fees from a string <k>/<offset>/<max>"
@@ -530,9 +534,60 @@ elif options.command == "analyze":
             )
             nodes[source] = node
         node.channels += [munch.Munch.fromDict(channel)]
+        # if "satoshis" not in channel:
+        #     print(channel)
 
 
-    def centrality_map(node_id, new_peer=None, without_index=None):
+    def centrality_map2(node_id, new_peer=None, without_index=None):
+        start_node = nodes[node_id]
+        removed_channel = None
+        if new_peer is not None:
+            start_node.channels += [munch.Munch(source=node_id,
+                                                destination=new_peer[0],
+                                                public=True,
+                                                satoshis=new_peer[1])]
+        elif without_index is not None:
+            removed_channel = start_node.channels.pop(without_index)
+        visited = {}
+        newly_visited = {}
+        visited[start_node.node_id] = (start_node, 0)
+        newly_visited[start_node.node_id] = (start_node, 0)
+        hops = []
+        for depth in range(1, 10):
+            next_newly_visited = {}
+            for neighbour in newly_visited.values():
+                for channel in neighbour[0].channels:
+                    # if not channel.public:
+                    #     continue
+                    if channel.destination not in nodes:
+                        pass
+                        # print("node not found: " + channel.destination)
+                    else:
+                        new_node = nodes[channel.destination]
+                        if new_node.node_id not in visited and new_node.node_id not in newly_visited:
+                            if new_node.node_id in next_newly_visited:
+                                old_entry = next_newly_visited[new_node.node_id]
+                                next_newly_visited[new_node.node_id] = (new_node, old_entry[1] + channel.satoshis)
+                            else:
+                                next_newly_visited[new_node.node_id] = (new_node, channel.satoshis)
+            # print("{} hops: {} nodes".format(depth, len(next_newly_visited)))
+            visited.update(newly_visited)
+            newly_visited = next_newly_visited
+            if len(newly_visited) == 0:
+                break
+            hop_sum = 0
+            for (node, sats) in newly_visited.values():
+                # print(node_entry)
+                hop_sum += sats
+            hops += [hop_sum / SATS_PER_BTC]
+        if new_peer is not None:
+            start_node.channels.pop()
+        elif without_index is not None:
+            start_node.channels.insert(without_index, removed_channel)
+        return hops
+
+
+    def centrality_map1(node_id, new_peer=None, without_index=None):
         start_node = nodes[node_id]
         removed_channel = None
         if new_peer is not None:
@@ -573,19 +628,20 @@ elif options.command == "analyze":
 
 
     def centrality_score(hops):
-        # hops = centrality_map(node_id)
         depth = 1
         wsum = 0
+        hop_sum = 0
         for hop in hops:
             wsum += hop * (1 / depth)
             depth += 1
-        wsum /= len(nodes)
+            hop_sum += hop
+        wsum /= hop_sum
         return round(wsum * 1000)
 
 
     def analyze(node_id, new_peer=None):
         print("Node {} {}".format(my_node.hashed_listnodes[node_id], node_id))
-        hops = centrality_map(node_id, new_peer=new_peer)
+        hops = centrality_map2(node_id, new_peer=new_peer)
         print("- hops: {}".format(hops))
         score = centrality_score(hops)
         print("- centrality score: {}".format(score))
@@ -598,12 +654,12 @@ elif options.command == "analyze":
         else:
             node_id = options.node
         print("Node {} {}".format(my_node.hashed_listnodes[node_id], node_id))
-        channel_hops = centrality_map(node_id)
+        channel_hops = centrality_map2(node_id)
         print("- hops: {}".format(channel_hops))
         score = centrality_score(channel_hops)
         print("- centrality score: {}".format(score))
     elif options.bestpeers:
-        print("Searching for best connectivity peers")
+        print("Searching for best connectivity peers with new capacity: {} sats".format(options.amount))
         if options.limit > 0:
             limit = options.limit
         else:
@@ -613,7 +669,7 @@ elif options.command == "analyze":
         for node in nodes.values():
             if len(node.channels) < 25:
                 continue
-            channel_hops = centrality_map(my_node.id, new_peer=node.node_id)
+            channel_hops = centrality_map2(my_node.id, new_peer=(node.node_id, options.amount))
             new_score = centrality_score(channel_hops)
             if new_score <= current_score:
                 continue
@@ -641,7 +697,7 @@ elif options.command == "analyze":
             if len(node.channels) < 25:
                 continue
             print()
-            channel_hops = centrality_map(node.node_id)
+            channel_hops = centrality_map2(node.node_id)
             new_score = centrality_score(channel_hops)
             score_board += [(node, new_score)]
             score_board.sort(key=lambda x: x[1], reverse=True)
@@ -657,27 +713,27 @@ elif options.command == "analyze":
     elif options.channels:
         channels = nodes[my_node.id].channels
         index = 0
-        hops = centrality_map(my_node.id)
+        hops = centrality_map2(my_node.id)
         node_score = centrality_score(hops)
         print("Node current score: {}".format(node_score))
         no_contrib_aliases = []
         for channel in channels:
-            channel_hops = centrality_map(channel.destination)
+            channel_hops = centrality_map2(channel.destination)
             channel_score = centrality_score(channel_hops)
-            node_hops = centrality_map(my_node.id, without_index=index)
+            node_hops = centrality_map2(my_node.id, without_index=index)
             contrib_score = centrality_score(node_hops)
             contrib = node_score - contrib_score
             alias = filter_alias(my_node.hashed_listnodes[channel.destination])
             if contrib > 0:
-                print("{:24.24} {}: {} {:+d}".format(alias,
-                                                     channel.destination,
-                                                     channel_score,
-                                                     contrib))
+                print("{:24.24} {} {:8d}: {} {:+d}".format(alias,
+                                                           channel.destination,
+                                                           channel.satoshis,
+                                                           channel_score,
+                                                           contrib))
             else:
                 no_contrib_aliases += [alias]
             index += 1
         print("No connectivity contribution: " + ", ".join(no_contrib_aliases))
-
 
 """
 print(clapi.getinfo())
