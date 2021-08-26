@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import re
 import string
 import sys
 import subprocess
@@ -24,6 +25,148 @@ LCW_DATA_PATH = os.getenv("HOME") + "/.lcwdata.json"
 # 3   all       short        bars
 # 4   all       short        values
 # 5   all       long         values
+
+
+class ConditionSign:
+    PLUS = "+"
+    MINUS = "-"
+
+    def __init__(self):
+        pass
+
+
+class ConditionOp:
+    OP_EQUAL = "="
+    OP_NOT_EQUAL = "<>"
+    OP_GREATER = ">"
+    OP_GREATER_OR_EQUAL = ">="
+    OP_LOWER = "<"
+    OP_LOWER_OR_EQUAL = "<="
+    OP_TRUE = "any"
+    OP_FALSE = "none"
+
+
+def eval_arg(obj, arg):
+    if arg is None:
+        return None
+    try:
+        return float(arg)
+    except Exception:
+        if arg in obj:
+            return obj[arg]
+        else:
+            return arg
+    # return arg
+
+
+class StateFilter:
+    OR = "or"
+    AND = "and"
+    NOT = "not"
+
+    def __init__(self, op):
+        self.op = op
+
+
+class ObjCondition:
+    def __init__(self, string):
+        self.left = None
+        self.right = None
+        self.op = ConditionOp.OP_TRUE
+        regexp = re.compile("([\w]+)$")
+        m = regexp.match(string)
+        if m:
+            self.left = None
+            self.right = None
+            self.op = string
+            return
+        regexp = re.compile("([\w]+)[\s]*([<>=]+)[\s]*([\w]+)$")
+        m = regexp.match(string)
+        if m:
+            self.left = m.group(1)
+            self.op = m.group(2)
+            self.right = m.group(3)
+            return
+        print("malformed object condition: " + string)
+
+    def exec(self, obj):
+        if self.op == ConditionOp.OP_TRUE:
+            return True
+        elif self.op == ConditionOp.OP_FALSE:
+            return False
+        left = eval_arg(obj, self.left)
+        right = eval_arg(obj, self.right)
+        try:
+            if self.op == ConditionOp.OP_EQUAL:
+                return left == right
+            elif self.op == ConditionOp.OP_NOT_EQUAL:
+                return left != right
+            elif self.op == ConditionOp.OP_GREATER:
+                return left > right
+            elif self.op == ConditionOp.OP_GREATER_OR_EQUAL:
+                return left >= right
+            elif self.op == ConditionOp.OP_LOWER:
+                return left < right
+            elif self.op == ConditionOp.OP_LOWER_OR_EQUAL:
+                return left <= right
+            else:
+                return False
+        except Exception:
+            return False
+
+
+# class ObjFilter:
+#     def __init__(self, string):
+#         pass
+
+
+class FilterPipe:
+    def __init__(self):
+        self.filters = []
+
+    def add_filter(self, string):
+        if string.startswith("+"):
+            sign = ConditionSign.PLUS
+            condition = string[1:]
+        elif string.startswith("-"):
+            sign = ConditionSign.MINUS
+            condition = string[1:]
+        else:
+            sign = ConditionSign.PLUS
+            condition = string
+        condition = condition.strip()
+        filter = None
+        if condition == StateFilter.OR:
+            filter = StateFilter(StateFilter.OR)
+        elif condition == StateFilter.AND:
+            filter = StateFilter(StateFilter.AND)
+        elif condition == StateFilter.NOT:
+            filter = StateFilter(StateFilter.NOT)
+        if filter is not None:
+            self.filters += [filter]
+        else:
+            self.filters += [(sign, ObjCondition(condition))]
+
+    def exec(self, obj):
+        result = True
+        for filter in self.filters:
+            if isinstance(filter, StateFilter):
+                if filter.op == StateFilter.OR:
+                    if result:
+                        return True
+                elif filter.op == StateFilter.AND:
+                    if not result:
+                        return False
+                elif filter.op == StateFilter.NOT:
+                    result = not result
+            else:
+                (sign, condition) = filter
+                condition_result = condition.exec(obj)
+                if sign == ConditionSign.PLUS and condition_result:
+                    result = True
+                elif sign == ConditionSign.MINUS and condition_result:
+                    result = False
+        return result
 
 
 def file_content(path):
@@ -353,7 +496,15 @@ class Node:
                                                                        DEFAULT_BASE_FEE,
                                                                        new_ppm_fee))
 
-    def print_status(self, verbosity=1, sort_key=None, limit=0):
+    def print_status(self, verbosity=2, sort_key=None, limit=0, filters=None):
+        if not filters:
+            if verbosity <= 2:
+                filters = ["-any", "total_payments>0", "age<1", "status<>CHANNELD_NORMAL"]
+            else:
+                filters = []
+        pipe = FilterPipe()
+        for filter in filters:
+            pipe.add_filter(filter)
         print("Wallet funds (BTC):")
         print("- Confirmed:   {:11.8f}".format(self.wallet_value_confirmed / SATS_PER_BTC))
         print("- Unconfirmed: {:11.8f}".format(self.wallet_value_unconfirmed / SATS_PER_BTC))
@@ -372,15 +523,17 @@ class Node:
             if limit > 0:
                 if count >= limit:
                     break
-            show = True
-            if verbosity <= 2:
-                if channel.total_payments == 0:
-                    show = False
-            if channel.state != "CHANNELD_NORMAL":
-                show = True
-            if channel.age < 1:
-                show = True
-            if show is False:
+            # show = True
+            #if verbosity <= 2:
+            #    if channel.total_payments == 0:
+            #        show = False
+            # if channel.state != "CHANNELD_NORMAL":
+            #     show = True
+            # if channel.age < 1:
+            #     show = True
+            # if show is False:
+            #     continue
+            if not pipe.exec(channel):
                 continue
             count += 1
             payments_str = "{:8s} {:4d}".format(
@@ -455,6 +608,10 @@ parser.add_option("-l", "--limit",
                   action="store", type="int", dest="limit", default=0,
                   help="Limit number of channels logged to provided parameter")
 
+parser.add_option("-f", "--filter",
+                  action="append", type="string", dest="filters", default=[],
+                  help="Add a display filter")
+
 parser.add_option("", "--force",
                   action="store_true", dest="force", default=False,
                   help="Do not skip 0 fees settings")
@@ -471,7 +628,7 @@ parser.add_option("", "--amount",
                   action="store", type="int", dest="amount", default=15000000,
                   help="Amount for new channel when searching for best peers")
 
-parser.add_option("-f", "--fees",
+parser.add_option("", "--fees",
                   action="store", type="string", dest="fees", default="50/-40/2000",
                   help="Set ppm fees from a string <k>/<offset>/<max>"
                        "Base fee is always 0")
@@ -517,7 +674,8 @@ elif options.command == "setfees":
 elif options.command == "status":
     my_node.print_status(verbosity=options.verbosity,
                          sort_key=options.sort_key,
-                         limit=options.limit)
+                         limit=options.limit,
+                         filters=options.filters)
 elif options.command == "analyze":
     print("getting all channels...")
     channels = clapi.listchannels()
@@ -741,4 +899,15 @@ elif options.command == "analyze":
 print(clapi.getinfo())
 print(clapi.listfunds())
 print(clapi.listchannels(None,None))
+"""
+
+"""
+p = re.compile("([\w]+)[\s]*([<>=]+)[\s]*([\w]+)")
+m = p.match("age>= 25")
+if m:
+    print('Match found: ', m.group(1))
+    print('Match found: ', m.group(2))
+    print('Match found: ', m.group(3))
+else:
+    print('No match')
 """
