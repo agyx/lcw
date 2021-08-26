@@ -435,15 +435,12 @@ class Node:
                         channel.out_payments_offered -= channel_ref["out_payments_offered"]
                         channel.in_msatoshi_offered -= channel_ref["in_msatoshi_offered"]
                         channel.out_msatoshi_offered -= channel_ref["out_msatoshi_offered"]
-                        channel.total_payments_offered = (channel.in_payments_offered + channel.out_payments_offered)
-                    else:
-                        channel.total_payments_offered = None
+                channel.total_payments_offered = (channel.in_payments_offered + channel.out_payments_offered)
                 channel.routed_amount = (channel.in_msatoshi_fulfilled + channel.out_msatoshi_fulfilled) / 1000
                 channel.routed_capacity = channel.routed_amount / channel.total_capacity
                 channel.total_payments = channel.in_payments + channel.out_payments
-                if channel.total_payments_offered is not None:
-                    if channel.total_payments_offered != 0:
-                        channel.settle_rate = channel.total_payments / channel.total_payments_offered * 100
+                if channel.total_payments_offered != 0:
+                    channel.settle_rate = channel.total_payments / channel.total_payments_offered * 100
                 self.in_payments += channel.in_payments
                 self.out_payments += channel.out_payments
                 self.routed_amount += (channel.in_msatoshi_fulfilled + channel.out_msatoshi_fulfilled) / 2 / 1000
@@ -513,7 +510,7 @@ class Node:
                 channel.out_payments),
             channel.total_payments,
         )
-        settle_rate_str = "{:4.1f}%".format(channel.settle_rate) if channel.settle_rate is not None else " n/a "
+        settle_rate_str = "{:5.1f}%".format(channel.settle_rate) if channel.settle_rate is not None else "  n/a "
         print("- {:13s}  {}  {}  {}  {}  {:5.1f}  {:6.2f}  {}  {} ({}/{})".format(
             channel.short_id,
             peer_id_string(channel.alias, channel.peer_id, verbosity),
