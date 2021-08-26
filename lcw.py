@@ -365,6 +365,7 @@ class Node:
                 self.new_channels += 1
                 new_channel = True
             channel = munch.Munch(peer_id=channel_data["peer_id"],
+                                  short_id=short_channel_id,
                                   input_capacity=input,
                                   output_capacity=output,
                                   total_capacity=input + output,
@@ -384,7 +385,9 @@ class Node:
                                   ppm_fee=0,
                                   alias="?",
                                   routed_amount=0,
-                                  routed_capacity=0)
+                                  routed_capacity=0,
+                                  total_payments_offered=None,
+                                  settle_rate=None)
             self.channels[short_channel_id] = channel
             self.input_capacity += input
             self.output_capacity += output
@@ -432,9 +435,15 @@ class Node:
                         channel.out_payments_offered -= channel_ref["out_payments_offered"]
                         channel.in_msatoshi_offered -= channel_ref["in_msatoshi_offered"]
                         channel.out_msatoshi_offered -= channel_ref["out_msatoshi_offered"]
+                        channel.total_payments_offered = (channel.in_payments_offered + channel.out_payments_offered)
+                    else:
+                        channel.total_payments_offered = None
                 channel.routed_amount = (channel.in_msatoshi_fulfilled + channel.out_msatoshi_fulfilled) / 1000
                 channel.routed_capacity = channel.routed_amount / channel.total_capacity
                 channel.total_payments = channel.in_payments + channel.out_payments
+                if channel.total_payments_offered is not None:
+                    if channel.total_payments_offered != 0:
+                        channel.settle_rate = channel.total_payments / channel.total_payments_offered * 100
                 self.in_payments += channel.in_payments
                 self.out_payments += channel.out_payments
                 self.routed_amount += (channel.in_msatoshi_fulfilled + channel.out_msatoshi_fulfilled) / 2 / 1000
@@ -496,6 +505,30 @@ class Node:
                                                                        DEFAULT_BASE_FEE,
                                                                        new_ppm_fee))
 
+    def print_channel(self, channel, verbosity):
+        # "- {short_id:13s}  {peer_info}  {cap_info}  {payments_info}  {age_info}  {tx_per_day:5.1f}  {routed_capacity:6.2f}  {state} ({base_fee_msat}/{ppm_fee})"
+        payments_str = "{:8s} {:4d}".format(
+            "{:4d}-{:<d}".format(
+                channel.in_payments,
+                channel.out_payments),
+            channel.total_payments,
+        )
+        settle_rate_str = "{:4.1f}%".format(channel.settle_rate) if channel.settle_rate is not None else " n/a "
+        print("- {:13s}  {}  {}  {}  {}  {:5.1f}  {:6.2f}  {}  {} ({}/{})".format(
+            channel.short_id,
+            peer_id_string(channel.alias, channel.peer_id, verbosity),
+            capacity_string(channel.input_capacity, channel.output_capacity, verbosity),
+            payments_str,
+            age_string2(channel.age),
+            channel.tx_per_day,
+            channel.routed_capacity,
+            # age_string(channel.last_update),
+            settle_rate_str,
+            channel.state,
+            channel.base_fee_msat,
+            channel.ppm_fee
+        ))
+
     def print_status(self, verbosity=2, sort_key=None, limit=0, filters=None):
         if not filters:
             if verbosity <= 2:
@@ -523,38 +556,10 @@ class Node:
             if limit > 0:
                 if count >= limit:
                     break
-            # show = True
-            #if verbosity <= 2:
-            #    if channel.total_payments == 0:
-            #        show = False
-            # if channel.state != "CHANNELD_NORMAL":
-            #     show = True
-            # if channel.age < 1:
-            #     show = True
-            # if show is False:
-            #     continue
             if not pipe.exec(channel):
                 continue
             count += 1
-            payments_str = "{:8s} {:4d}".format(
-                "{:4d}-{:<d}".format(
-                    channel.in_payments,
-                    channel.out_payments),
-                channel.total_payments,
-            )
-            print("- {:13s}  {}  {}  {}  {}  {:5.1f}  {:6.2f}  {} ({}/{})".format(
-                channel_id,
-                peer_id_string(channel.alias, channel.peer_id, verbosity),
-                capacity_string(channel.input_capacity, channel.output_capacity, verbosity),
-                payments_str,
-                age_string2(channel.age),
-                channel.tx_per_day,
-                channel.routed_capacity,
-                # age_string(channel.last_update),
-                channel.state,
-                channel.base_fee_msat,
-                channel.ppm_fee
-            ))
+            self.print_channel(channel, verbosity)
         print("Node summary:")
         print("- # of channels   : {}".format(self.channel_count))
         print("- Capacity        : {:.8f} ({:.8f} + {:.8f})".format(
@@ -910,4 +915,8 @@ if m:
     print('Match found: ', m.group(3))
 else:
     print('No match')
+
+
+args = [1,2,3]
+print("{} {} {}".format(*args))
 """
