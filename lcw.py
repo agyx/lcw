@@ -678,11 +678,12 @@ elif options.command == "analyze":
             count = 0
             print()
             for score in score_board:
-                print("{:24.24} {}: {} ({:+d})".format(filter_alias(my_node.hashed_listnodes[score[0].node_id]),
-                                                       score[0].node_id,
-                                                       score[1],
-                                                       score[1] - current_score))
                 count += 1
+                print("{:3d}  {:24.24} {}: {} ({:+d})".format(count,
+                                                              filter_alias(my_node.hashed_listnodes[score[0].node_id]),
+                                                              score[0].node_id,
+                                                              score[1],
+                                                              score[1] - current_score))
                 if count == limit:
                     break
             print()
@@ -704,10 +705,11 @@ elif options.command == "analyze":
             count = 0
             print()
             for score in score_board:
-                print("{:24.24} {}: {}".format(filter_alias(my_node.hashed_listnodes[score[0].node_id]),
-                                               score[0].node_id,
-                                               score[1]))
                 count += 1
+                print("{:3d}  {:24.24} {}: {}".format(count,
+                                                      filter_alias(my_node.hashed_listnodes[score[0].node_id]),
+                                                      score[0].node_id,
+                                                      score[1]))
                 if count == limit:
                     break
     elif options.channels:
