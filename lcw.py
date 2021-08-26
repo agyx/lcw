@@ -499,7 +499,7 @@ class Node:
     def print_status(self, verbosity=2, sort_key=None, limit=0, filters=None):
         if not filters:
             if verbosity <= 2:
-                filters = ["-any", "total_payments>0", "age<1", "status<>CHANNELD_NORMAL"]
+                filters = ["-any", "total_payments>0", "age<1", "state<>CHANNELD_NORMAL"]
             else:
                 filters = []
         pipe = FilterPipe()
