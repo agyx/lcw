@@ -643,6 +643,10 @@ parser.add_option("", "--channels",
                   action="store_true", dest="channels", default=False,
                   help="Analyze connectivity contribution of node's current channels")
 
+parser.add_option("", "--channel",
+                  action="store", dest="channel", default=None,
+                  help="Display all details about a specified channel")
+
 parser.add_option("", "--bestnodes",
                   action="store_true", dest="bestnodes", default=False,
                   help="Search for best connected nodes")
@@ -653,10 +657,10 @@ parser.add_option("", "--node",
 
 parser.add_option("", "--command",
                   action="store", type="string", dest="command", default="status",
-                  help="store: Store current channels information into json history file"
-                       "status:"
-                       "setfees:"
-                       "analyze:"
+                  help="store: Store current channels information into json history file\n"
+                       "status:\n"
+                       "setfees:\n"
+                       "analyze:\n"
                   )
 
 (options, args) = parser.parse_args()
@@ -674,10 +678,33 @@ elif options.command == "setfees":
     fees = options.fees.split("/")
     my_node.set_fees(options.force, int(fees[0]), int(fees[1]), int(fees[2]))
 elif options.command == "status":
-    my_node.print_status(verbosity=options.verbosity,
-                         sort_key=options.sort_key,
-                         limit=options.limit,
-                         filters=options.filters)
+    if options.channel is not None:
+        selected = []
+        for peer in my_node.listpeers["peers"]:
+            if peer["id"] == options.channel:
+                selected = [peer]
+                break
+            if options.channel in peer["id"]:
+                selected += [peer]
+                continue
+            for channel in peer["channels"]:
+                if channel["short_channel_id"] == options.channel:
+                    selected = [channel]
+                    break
+            if len(selected) > 0:
+                break
+            # search short channel ids
+        if selected:
+            for item in selected:
+                print(json.dumps(item, indent=3))
+                print("--------------------------")
+        else:
+            print("specified id not found in peers list")
+    else:
+        my_node.print_status(verbosity=options.verbosity,
+                             sort_key=options.sort_key,
+                             limit=options.limit,
+                             filters=options.filters)
 elif options.command == "analyze":
     print("getting all channels...")
     channels = clapi.listchannels()
