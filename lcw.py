@@ -315,15 +315,19 @@ class CLightning:
 class Node:
 
     def __init__(self, since=None):
-        self.data_stored = None
         self.date_ref = None
         self.since = None
-        if since is not None:
-            data_stored = file_content(LCW_DATA_PATH)
-            if data_stored is not None:
+        self.ref_data = None
+        self.ignored_channels = []
+        data_stored = file_content(LCW_DATA_PATH)
+        if data_stored is not None:
+            if "ignored" in data_stored:
+                self.ignored_channels = data_stored["ignored"]
+            if since is not None:
+                history = data_stored["history"]
                 self.date_ref = day(since)
-                if self.date_ref in data_stored:
-                    self.data_stored = data_stored[self.date_ref]
+                if self.date_ref in history:
+                    self.ref_data = history[self.date_ref]
                     self.period = (NOW - timestamp_from_day(self.date_ref)) / 86400
                     self.since = since
         self.getinfo = clapi.getinfo()
@@ -474,8 +478,8 @@ class Node:
                 channel.alias = self.hashed_listnodes[channel.peer_id]
 
     def get_channel_ref(self, channel_id):
-        if self.data_stored is not None and channel_id in self.data_stored:
-            return self.data_stored[channel_id]
+        if self.ref_data is not None and channel_id in self.ref_data:
+            return self.ref_data[channel_id]
         else:
             return None
 
@@ -539,6 +543,9 @@ class Node:
         print("- Confirmed:   {:11.8f}".format(self.wallet_value_confirmed / SATS_PER_BTC))
         print("- Unconfirmed: {:11.8f}".format(self.wallet_value_unconfirmed / SATS_PER_BTC))
         print("- TOTAL:       {:11.8f}".format(self.total_wallet / SATS_PER_BTC))
+        for channel_id in self.ignored_channels:
+            if channel_id in self.channels:
+                del self.channels[channel_id]
         print("Channels: " + ("(ref: {} days ago)".format(self.since) if self.since is not None else ""))
         items = list(self.channels.items())
         if sort_key is not None:
@@ -580,17 +587,18 @@ class Node:
         #     print("Median last update : {:4.1f} days".format((NOW - median_value) / DAY))
         print()
 
-    def store(self):
+    def store_today_data(self):
         stored_data = file_content(LCW_DATA_PATH)
         if stored_data is None:
             stored_json = {}
         else:
             stored_json = stored_data
         today = day()
-        if today in stored_json:
-            print("today's data is alresady stored")
+        history = stored_json["history"]
+        if today in history:
+            print("today's data is already stored")
             return
-        stored_json[today] = self.channels
+        history[today] = self.channels
         file = open(LCW_DATA_PATH, "w")
         file.write(json.dumps(stored_json))
         file.close()
@@ -621,6 +629,10 @@ parser.add_option("", "--force",
 parser.add_option("-s", "--sort",
                   action="store", type="string", dest="sort_key", default=None,
                   help="Sort channels with provided key")
+
+parser.add_option("-i", "--ignore",
+                  action="store", type="string", dest="ignored_channel", default=None,
+                  help="Ignore the specified channel for ever")
 
 parser.add_option("", "--since",
                   action="store", type="int", dest="since", default=None,
@@ -672,8 +684,28 @@ if options.command != "status":
 
 my_node = Node(since=options.since)
 
+
+def ignore_channel(channel_id):
+    stored_data = file_content(LCW_DATA_PATH)
+    if stored_data is None:
+        stored_json = {}
+    else:
+        stored_json = stored_data
+    if "ignored" in stored_json:
+        ignored = stored_json["ignored"]
+    else:
+        ignored = []
+        stored_json["ignored"] = ignored
+    ignored += [channel_id]
+    file = open(LCW_DATA_PATH, "w")
+    file.write(json.dumps(stored_json))
+    file.close()
+
+
 if options.command == "store":
-    my_node.store()
+    my_node.store_today_data()
+elif options.ignored_channel:
+    ignore_channel(options.ignored_channel)
 elif options.command == "setfees":
     fees = options.fees.split("/")
     my_node.set_fees(options.force, int(fees[0]), int(fees[1]), int(fees[2]))
